@@ -14,6 +14,9 @@
     "@commitlint/config-conventional": "^19.5.0"
   },
   "lint-staged": {
+    "frontend/**/*.{ts,tsx,js,jsx}": [
+      "bash -c 'cd frontend && pnpm exec eslint --fix --no-warn-ignored ${@#frontend/}' --"
+    ],
     "backend/**/*.py": [
       "bash -c 'cd backend && ruff check --fix ${@#backend/}' --",
       "bash -c 'cd backend && ruff format ${@#backend/}' --"
