@@ -1,0 +1,22 @@
+{
+  "name": "build-test-ai",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "prepare": "husky",
+    "lint:frontend": "pnpm --dir frontend lint",
+    "lint:backend": "ruff check backend/app backend/tests"
+  },
+  "devDependencies": {
+    "husky": "^9.1.6",
+    "lint-staged": "^15.2.10",
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0"
+  },
+  "lint-staged": {
+    "backend/**/*.py": [
+      "bash -c 'cd backend && ruff check --fix ${@#backend/}' --",
+      "bash -c 'cd backend && ruff format ${@#backend/}' --"
+    ]
+  }
+}

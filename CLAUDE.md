@@ -34,6 +34,28 @@ BuildTest AI 是面向 RAG / Agent 应用的 **开发 + 评测 + 迭代** 一体
 - `models.model_type` 区分 `llm` vs `embedding`:知识库只能绑定 embedding 模型,评测任务只能绑定 llm 模型。
 - Prompt 模板更新时 `version` 自动递增,**不要原地覆盖历史版本**——评测结果需回溯到具体 prompt 版本。
 
+## Commit 规范
+
+项目已启用 husky + commitlint + lint-staged(根 `package.json` / `commitlint.config.mjs` / `.husky/`)。生成 commit message 时必须满足:
+
+- **格式**:`<type>(<scope>): <subject>`,遵循 Conventional Commits。
+- **type 枚举**(commitlint 硬校验,超出会被拒):`feat` / `fix` / `docs` / `style` / `refactor` / `perf` / `test` / `build` / `ci` / `chore` / `revert`。
+- **scope 建议**(可选但推荐):`frontend` / `backend` / `db`(迁移)/ `kb`(知识库)/ `eval`(评测)/ `auth` / `ci` / `deps` / `docker`,跨域改动可省略 scope。
+- **subject**:**使用中文**,祈使句,不加句号,不超过 50 字;header 整体 ≤100 字符。
+- **body**(可选):解释 **为什么** 改,不是 **改了什么**——diff 已经能看出 what。跨越多文件或引入 breaking 改动时必须写。
+- **footer**:破坏性变更用 `BREAKING CHANGE:` 开头;关联 issue 用 `Refs: #123` 或 `Closes: #123`。
+- **范围控制**:一次 commit 聚焦一件事;前后端同步改动若耦合紧密可合并,否则拆开。迁移文件(`alembic/versions/*`)应单独 commit,scope 用 `db`。
+- **生成工具**:推荐用 `/buddy:commit`(分析 diff 自动生成)。禁止 `--no-verify` 绕过 hook,除非紧急 hotfix 并在 PR 描述中说明。
+
+示例:
+
+```
+feat(kb): 支持 qdrant 多租户 collection 隔离
+
+每个用户的向量数据落到独立 collection,避免跨租户检索泄漏。
+collection 名按 user_id 派生,vector_db_configs 新增 namespace 字段。
+```
+
 ## 开发命令
 
 全栈启动需先 `cp .env.example .env` 并填入 `GITHUB_ID/SECRET`、`GOOGLE_ID/SECRET`、`NEXTAUTH_SECRET`、`APP_ENCRYPTION_KEY`、`OPENAI_API_KEY`(详见 `KEYS.md`)。
