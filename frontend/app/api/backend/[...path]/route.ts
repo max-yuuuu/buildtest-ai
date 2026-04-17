@@ -21,6 +21,8 @@ async function proxy(req: NextRequest, pathParts: string[]) {
     headers: {
       "Content-Type": req.headers.get("content-type") ?? "application/json",
       "X-User-Id": (session.user as { id?: string }).id ?? "",
+      "X-User-Email": session.user.email ?? "",
+      "X-User-Name": session.user.name ?? "",
     },
     body,
   });
