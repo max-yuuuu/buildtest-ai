@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: buildtest
+          POSTGRES_PASSWORD: buildtest
+          POSTGRES_DB: buildtest
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U buildtest"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt ruff
+      - run: ruff check .
+      - env:
+          APP_ENCRYPTION_KEY: zmWkQ4E3S1m-_7fCxVU2hVJ0b4N8tGxkgD6bYvTqP4Y=
+          CELERY_TASK_ALWAYS_EAGER: "True"
+          DATABASE_URL: postgresql+asyncpg://buildtest:buildtest@localhost:5432/buildtest
+          REDIS_URL: redis://localhost:6379/0
+        run: pytest
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
