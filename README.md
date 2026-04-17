@@ -4,7 +4,7 @@ RAG / Agent 应用的 **开发 + 评测 + 迭代** 一体化平台。
 
 ## 文档
 
-- `build-test-ai.md` — 产品与技术设计(含附录 A:团队评审决策)
+- `buildtest-ai.md` — 产品与技术设计(含附录 A:团队评审决策)
 - `KEYS.md` — 密钥与环境变量清单
 - `.env.example` — 环境变量模板
 
@@ -33,7 +33,7 @@ RAG / Agent 应用的 **开发 + 评测 + 迭代** 一体化平台。
 ## 目录
 
 ```
-build-test-ai/
+buildtest-ai/
 ├── backend/           FastAPI + Celery + Alembic
 │   ├── app/
 │   ├── tests/

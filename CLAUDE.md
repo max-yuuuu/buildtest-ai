@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 单一事实源
 
-设计文档 `build-test-ai.md` 是产品与技术设计的 **single source of truth**(数据库 schema §3、API 风格 §4、里程碑 §8 都在此)。与代码冲突时,先确认是否是文档滞后;若是,更新文档再改代码。`KEYS.md` 为密钥清单,`.env.example` 为变量模板。
+设计文档 `buildtest-ai.md` 是产品与技术设计的 **single source of truth**(数据库 schema §3、API 风格 §4、里程碑 §8 都在此)。与代码冲突时,先确认是否是文档滞后;若是,更新文档再改代码。`KEYS.md` 为密钥清单,`.env.example` 为变量模板。
 
 ## 产品定位
 
@@ -96,4 +96,4 @@ pnpm gen:api-types                           # 从后端 openapi.json 生成 lib
 
 ## 里程碑优先级
 
-按 `build-test-ai.md` §8 分阶段推进。**Phase 1 的 Embedding 允许先同步实现**(显式注明 TODO),Phase 3 再切 Celery——不要在 Phase 1 就过度设计异步链路。
+按 `buildtest-ai.md` §8 分阶段推进。**Phase 1 的 Embedding 允许先同步实现**(显式注明 TODO),Phase 3 再切 Celery——不要在 Phase 1 就过度设计异步链路。
