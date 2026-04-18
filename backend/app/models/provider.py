@@ -21,6 +21,7 @@ class Provider(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     provider_type: Mapped[str] = mapped_column(String(50), nullable=False)
     api_key_encrypted: Mapped[str] = mapped_column(EncryptedString(1024), nullable=False)
+    api_key_mask: Mapped[str] = mapped_column(String(64), nullable=False)
     base_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 

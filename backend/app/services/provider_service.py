@@ -15,10 +15,7 @@ class ProviderService:
         self.repo = ProviderRepository(session, user_id)
 
     @staticmethod
-    def _to_read(p: Provider, plain_key_hint: str | None = None) -> ProviderRead:
-        # ProviderRead 需要 api_key_mask;mask 基于密文长度无法精确,
-        # 创建/更新时用明文 mask;读取列表时用固定占位(避免解密开销)。
-        mask = mask_api_key(plain_key_hint) if plain_key_hint else "***...***"
+    def _to_read(p: Provider) -> ProviderRead:
         return ProviderRead(
             id=p.id,
             user_id=p.user_id,
@@ -26,7 +23,7 @@ class ProviderService:
             provider_type=p.provider_type,  # type: ignore[arg-type]
             base_url=p.base_url,
             is_active=p.is_active,
-            api_key_mask=mask,
+            api_key_mask=p.api_key_mask,
             created_at=p.created_at,
             updated_at=p.updated_at,
         )
@@ -39,20 +36,21 @@ class ProviderService:
         p = await self.repo.get(provider_id)
         if p is None:
             raise HTTPException(status_code=404, detail="provider not found")
-        return self._to_read(p, plain_key_hint=p.api_key_encrypted)
+        return self._to_read(p)
 
     async def create(self, data: ProviderCreate) -> ProviderRead:
         provider = Provider(
             name=data.name,
             provider_type=data.provider_type,
             api_key_encrypted=data.api_key,  # EncryptedString 在落库时自动加密
+            api_key_mask=mask_api_key(data.api_key),
             base_url=data.base_url,
             is_active=data.is_active,
         )
         await self.repo.create(provider)
         await self.session.commit()
         await self.session.refresh(provider)
-        return self._to_read(provider, plain_key_hint=data.api_key)
+        return self._to_read(provider)
 
     async def update(self, provider_id: uuid.UUID, data: ProviderUpdate) -> ProviderRead:
         p = await self.repo.get(provider_id)
@@ -62,17 +60,24 @@ class ProviderService:
             p.name = data.name
         if data.api_key is not None:
             p.api_key_encrypted = data.api_key
+            p.api_key_mask = mask_api_key(data.api_key)
         if data.base_url is not None:
             p.base_url = data.base_url
         if data.is_active is not None:
             p.is_active = data.is_active
         await self.session.commit()
         await self.session.refresh(p)
-        return self._to_read(p, plain_key_hint=p.api_key_encrypted)
+        return self._to_read(p)
 
     async def delete(self, provider_id: uuid.UUID) -> None:
         p = await self.repo.get(provider_id)
         if p is None:
             raise HTTPException(status_code=404, detail="provider not found")
+        refs = await self.repo.count_models_referencing(provider_id)
+        if refs > 0:
+            raise HTTPException(
+                status_code=409,
+                detail=f"provider is referenced by {refs} model(s); remove them first",
+            )
         await self.repo.delete(p)
         await self.session.commit()

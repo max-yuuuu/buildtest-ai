@@ -1,9 +1,10 @@
 import uuid
-from typing import Sequence
+from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.model import Model
 from app.models.provider import Provider
 
 
@@ -25,9 +26,7 @@ class ProviderRepository:
         return result.scalars().all()
 
     async def get(self, provider_id: uuid.UUID) -> Provider | None:
-        result = await self.session.execute(
-            self._base_stmt().where(Provider.id == provider_id)
-        )
+        result = await self.session.execute(self._base_stmt().where(Provider.id == provider_id))
         return result.scalar_one_or_none()
 
     async def create(self, provider: Provider) -> Provider:
@@ -41,3 +40,9 @@ class ProviderRepository:
 
         provider.deleted_at = datetime.now(UTC)
         await self.session.flush()
+
+    async def count_models_referencing(self, provider_id: uuid.UUID) -> int:
+        result = await self.session.execute(
+            select(func.count()).select_from(Model).where(Model.provider_id == provider_id)
+        )
+        return int(result.scalar_one())

@@ -21,7 +21,57 @@ async def test_create_and_list_provider(client, user_headers):
 
     resp = await client.get("/api/v1/providers", headers=user_headers)
     assert resp.status_code == 200
-    assert len(resp.json()) == 1
+    listed = resp.json()
+    assert len(listed) == 1
+    # list 路径也必须返回真 mask,而不是占位符。
+    assert listed[0]["api_key_mask"] == created["api_key_mask"]
+
+
+async def test_update_api_key_refreshes_mask(client, user_headers):
+    payload = {"name": "p", "provider_type": "openai", "api_key": "sk-oldkey12345678"}
+    r = await client.post("/api/v1/providers", json=payload, headers=user_headers)
+    pid = r.json()["id"]
+    old_mask = r.json()["api_key_mask"]
+
+    resp = await client.put(
+        f"/api/v1/providers/{pid}",
+        json={"api_key": "sk-newkey87654321"},
+        headers=user_headers,
+    )
+    assert resp.status_code == 200
+    new_mask = resp.json()["api_key_mask"]
+    assert new_mask != old_mask
+    assert new_mask.startswith("sk-n")
+    assert new_mask.endswith("4321")
+
+
+async def test_delete_blocked_when_model_references(client, user_headers, session_maker):
+    """provider 被 models 引用时 delete 必须 409,避免级联失活破坏评测血缘。"""
+    import uuid
+
+    from app.models.model import Model
+
+    payload = {"name": "p", "provider_type": "openai", "api_key": "sk-abcdefgh12345678"}
+    r = await client.post("/api/v1/providers", json=payload, headers=user_headers)
+    pid = r.json()["id"]
+
+    async with session_maker() as s:
+        s.add(
+            Model(
+                id=uuid.uuid4(),
+                provider_id=uuid.UUID(pid),
+                model_id="gpt-4o",
+                model_type="llm",
+            )
+        )
+        await s.commit()
+
+    resp = await client.delete(f"/api/v1/providers/{pid}", headers=user_headers)
+    assert resp.status_code == 409
+    assert "referenced" in resp.json()["detail"]
+
+    # 仍然可读(未软删)。
+    assert (await client.get(f"/api/v1/providers/{pid}", headers=user_headers)).status_code == 200
 
 
 async def test_get_provider(client, user_headers):
