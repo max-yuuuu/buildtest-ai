@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  Boxes,
   CheckCircle2,
   CircleDashed,
   Globe,
@@ -328,6 +331,11 @@ function ProviderCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/providers/${provider.id}/models` as Route}>
+                  管理模型
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={onEdit}>编辑</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -368,9 +376,13 @@ function ProviderCard({
               已停用
             </Badge>
           )}
-          <Badge variant="outline" className="font-mono text-[10px] uppercase">
-            {provider.provider_type}
-          </Badge>
+          <Link
+            href={`/providers/${provider.id}/models` as Route}
+            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+          >
+            <Boxes className="h-3.5 w-3.5" />
+            管理模型
+          </Link>
         </div>
       </div>
     </div>

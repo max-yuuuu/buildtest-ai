@@ -1,6 +1,10 @@
 import type {
+  AvailableModel,
+  Model,
+  ModelCreateInput,
   Provider,
   ProviderCreateInput,
+  ProviderTestResult,
   ProviderUpdateInput,
 } from "./types";
 
@@ -41,4 +45,22 @@ export const providerApi = {
     }),
   delete: (id: string) =>
     request<void>(`/providers/${id}`, { method: "DELETE" }),
+  test: (id: string) =>
+    request<ProviderTestResult>(`/providers/${id}/test`, { method: "POST" }),
+};
+
+export const modelApi = {
+  list: (providerId: string) =>
+    request<Model[]>(`/providers/${providerId}/models`),
+  listAvailable: (providerId: string) =>
+    request<AvailableModel[]>(`/providers/${providerId}/models/available`),
+  create: (providerId: string, data: ModelCreateInput) =>
+    request<Model>(`/providers/${providerId}/models`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  delete: (providerId: string, modelPk: string) =>
+    request<void>(`/providers/${providerId}/models/${modelPk}`, {
+      method: "DELETE",
+    }),
 };

@@ -26,3 +26,35 @@ export interface ProviderUpdateInput {
   base_url?: string | null;
   is_active?: boolean;
 }
+
+export interface ProviderTestResult {
+  ok: boolean;
+  latency_ms: number;
+  message: string;
+  models: string[];
+}
+
+export type ModelType = "llm" | "embedding";
+
+export interface Model {
+  id: string;
+  provider_id: string;
+  model_id: string;
+  model_type: ModelType;
+  context_window: number | null;
+  vector_dimension: number | null;
+  created_at: string;
+}
+
+export interface AvailableModel {
+  model_id: string;
+  suggested_type: ModelType | null;
+  is_registered: boolean;
+}
+
+export interface ModelCreateInput {
+  model_id: string;
+  model_type: ModelType;
+  context_window?: number | null;
+  vector_dimension?: number | null;
+}
