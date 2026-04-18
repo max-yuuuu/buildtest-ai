@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Uuid, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -15,6 +15,9 @@ class Model(Base):
     """
 
     __tablename__ = "models"
+    __table_args__ = (
+        UniqueConstraint("provider_id", "model_id", name="uq_models_provider_model_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     provider_id: Mapped[uuid.UUID] = mapped_column(
