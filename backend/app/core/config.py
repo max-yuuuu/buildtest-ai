@@ -25,5 +25,7 @@ class Settings(BaseSettings):
 
     celery_task_always_eager: bool = False
 
+    http_probe_timeout: float = 10.0
+
 
 settings = Settings()

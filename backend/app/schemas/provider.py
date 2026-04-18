@@ -36,6 +36,15 @@ class ProviderRead(ProviderBase):
     updated_at: datetime
 
 
+class ProviderTestResult(BaseModel):
+    """连通性测试结果。ok=False 仍返回 200,HTTP 错误码只用于 provider 不存在 / 未授权。"""
+
+    ok: bool
+    latency_ms: int
+    message: str
+    models: list[str] = Field(default_factory=list)
+
+
 def mask_api_key(plain: str) -> str:
     if len(plain) <= 8:
         return "***"

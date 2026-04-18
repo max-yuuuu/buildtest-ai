@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user_id, get_session
-from app.schemas.provider import ProviderCreate, ProviderRead, ProviderUpdate
+from app.schemas.provider import ProviderCreate, ProviderRead, ProviderTestResult, ProviderUpdate
 from app.services.provider_service import ProviderService
 
 router = APIRouter()
@@ -53,3 +53,12 @@ async def delete_provider(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     await ProviderService(session, user_id).delete(provider_id)
+
+
+@router.post("/{provider_id}/test", response_model=ProviderTestResult)
+async def test_provider(
+    provider_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> ProviderTestResult:
+    return await ProviderService(session, user_id).test_connection(provider_id)

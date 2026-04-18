@@ -1,3 +1,4 @@
+import time
 import uuid
 
 from fastapi import HTTPException
@@ -5,7 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.provider import Provider
 from app.repositories.provider import ProviderRepository
-from app.schemas.provider import ProviderCreate, ProviderRead, ProviderUpdate, mask_api_key
+from app.schemas.provider import (
+    ProviderCreate,
+    ProviderRead,
+    ProviderTestResult,
+    ProviderUpdate,
+    mask_api_key,
+)
+from app.services import provider_probe
 
 
 class ProviderService:
@@ -81,3 +89,19 @@ class ProviderService:
             )
         await self.repo.delete(p)
         await self.session.commit()
+
+    async def test_connection(self, provider_id: uuid.UUID) -> ProviderTestResult:
+        """上游连通性测试。测试失败返回 ok=False + 200,只有 provider 不存在才 4xx。"""
+        p = await self.repo.get(provider_id)
+        if p is None:
+            raise HTTPException(status_code=404, detail="provider not found")
+        started = time.perf_counter()
+        try:
+            models = await provider_probe.list_models(
+                p.provider_type, p.api_key_encrypted, p.base_url
+            )
+        except provider_probe.ProbeError as e:
+            elapsed = int((time.perf_counter() - started) * 1000)
+            return ProviderTestResult(ok=False, latency_ms=elapsed, message=str(e), models=[])
+        elapsed = int((time.perf_counter() - started) * 1000)
+        return ProviderTestResult(ok=True, latency_ms=elapsed, message="ok", models=models[:10])

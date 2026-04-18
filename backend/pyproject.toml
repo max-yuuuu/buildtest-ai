@@ -17,6 +17,7 @@ markers = [
 [tool.coverage.run]
 source = ["app"]
 omit = ["app/main.py", "*/migrations/*", "*/__init__.py"]
+concurrency = ["thread", "greenlet"]
 
 [tool.ruff]
 line-length = 100
@@ -24,3 +25,4 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["B008"]  # FastAPI Depends() 惯用写法允许作为默认参数
