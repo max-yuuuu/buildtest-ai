@@ -27,7 +27,8 @@ async function proxy(req: NextRequest, pathParts: string[]) {
     body,
   });
 
-  const data = await upstream.text();
+  const nullBodyStatus = upstream.status === 204 || upstream.status === 205 || upstream.status === 304;
+  const data = nullBodyStatus ? null : await upstream.text();
   return new NextResponse(data, {
     status: upstream.status,
     headers: { "Content-Type": upstream.headers.get("content-type") ?? "application/json" },
