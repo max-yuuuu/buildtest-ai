@@ -3,21 +3,14 @@
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { Github } from "lucide-react";
+import { Github, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 function LoginButtons() {
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl") ?? "/providers";
   return (
-    <CardContent className="space-y-3">
+    <div className="space-y-3">
       <Button
         className="w-full"
         variant="outline"
@@ -51,24 +44,63 @@ function LoginButtons() {
         </svg>
         使用 Google 登录
       </Button>
-    </CardContent>
+    </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-2 text-center">
-          <CardTitle className="text-3xl">BuildTest AI</CardTitle>
-          <CardDescription>
-            RAG / Agent 开发 + 评测 + 迭代一体化平台
-          </CardDescription>
-        </CardHeader>
-        <Suspense fallback={<CardContent>加载中...</CardContent>}>
-          <LoginButtons />
-        </Suspense>
-      </Card>
+    <main className="grid min-h-screen lg:grid-cols-2">
+      <aside className="relative hidden flex-col justify-between overflow-hidden bg-zinc-950 p-10 text-zinc-50 lg:flex">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-40"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 20% 10%, rgba(99,102,241,0.35), transparent 45%), radial-gradient(circle at 80% 90%, rgba(14,165,233,0.25), transparent 50%)",
+          }}
+          aria-hidden
+        />
+        <div className="relative flex items-center gap-2 text-lg font-semibold">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 backdrop-blur">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          BuildTest AI
+        </div>
+        <div className="relative space-y-3">
+          <p className="text-xl font-medium leading-relaxed">
+            让 AI 应用从&ldquo;能跑起来&rdquo;走到&ldquo;敢上线&rdquo;。
+          </p>
+          <p className="text-sm text-zinc-400">
+            面向 RAG / Agent 的开发 · 评测 · 迭代一体化平台。统一管理 Provider、知识库、Prompt 版本与评测结果。
+          </p>
+        </div>
+      </aside>
+
+      <section className="flex items-center justify-center px-4 py-12 sm:px-8">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="space-y-2 text-center lg:text-left">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              登录到 BuildTest AI
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              选择第三方账号快速登录,首次登录将自动创建账户。
+            </p>
+          </div>
+
+          <Suspense
+            fallback={
+              <div className="text-sm text-muted-foreground">加载中...</div>
+            }
+          >
+            <LoginButtons />
+          </Suspense>
+
+          <p className="text-center text-xs text-muted-foreground lg:text-left">
+            登录即表示同意 <span className="underline-offset-4">服务条款</span> 与{" "}
+            <span className="underline-offset-4">隐私政策</span>。
+          </p>
+        </div>
+      </section>
     </main>
   );
 }
