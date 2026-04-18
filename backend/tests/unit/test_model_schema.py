@@ -1,0 +1,39 @@
+import pytest
+from pydantic import ValidationError
+
+from app.schemas.model import ModelCreate, ModelUpdate
+
+
+def test_llm_model_accepts_no_vector_dim():
+    m = ModelCreate(model_id="gpt-4o", model_type="llm", context_window=128000)
+    assert m.model_type == "llm"
+    assert m.vector_dimension is None
+
+
+def test_embedding_model_requires_vector_dim():
+    with pytest.raises(ValidationError) as exc:
+        ModelCreate(model_id="text-embedding-3-small", model_type="embedding")
+    assert "vector_dimension" in str(exc.value)
+
+
+def test_embedding_model_ok_with_vector_dim():
+    m = ModelCreate(
+        model_id="text-embedding-3-small", model_type="embedding", vector_dimension=1536
+    )
+    assert m.vector_dimension == 1536
+
+
+def test_unknown_model_type_rejected():
+    with pytest.raises(ValidationError):
+        ModelCreate(model_id="x", model_type="rerank")  # type: ignore[arg-type]
+
+
+def test_model_update_partial():
+    u = ModelUpdate(context_window=200000)
+    assert u.context_window == 200000
+    assert u.model_type is None
+
+
+def test_non_positive_context_window_rejected():
+    with pytest.raises(ValidationError):
+        ModelCreate(model_id="x", model_type="llm", context_window=0)
