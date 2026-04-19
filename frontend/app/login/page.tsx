@@ -3,16 +3,25 @@
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { Github, Sparkles } from "lucide-react";
+import {
+  Database,
+  FlaskConical,
+  Github,
+  KeyRound,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 function LoginButtons() {
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl") ?? "/providers";
+  const oauthClass =
+    "h-11 w-full rounded-xl border-border/80 bg-background/70 font-medium backdrop-blur-sm transition-all hover:border-primary/35 hover:bg-accent/40 hover:shadow-sm";
   return (
     <div className="space-y-3">
       <Button
-        className="w-full"
+        className={oauthClass}
         variant="outline"
         onClick={() => signIn("github", { callbackUrl })}
       >
@@ -20,11 +29,11 @@ function LoginButtons() {
         使用 GitHub 登录
       </Button>
       <Button
-        className="w-full"
+        className={oauthClass}
         variant="outline"
         onClick={() => signIn("google", { callbackUrl })}
       >
-        <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+        <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden>
           <path
             fill="currentColor"
             d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -48,57 +57,187 @@ function LoginButtons() {
   );
 }
 
+const highlights = [
+  {
+    icon: KeyRound,
+    label: "Provider 加密托管",
+    iconBg: "bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-500",
+  },
+  {
+    icon: Database,
+    label: "知识库与向量检索",
+    iconBg: "bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-500",
+  },
+  {
+    icon: FlaskConical,
+    label: "评测任务可追溯",
+    iconBg: "bg-gradient-to-br from-violet-400 via-fuchsia-500 to-pink-500",
+  },
+] as const;
+
 export default function LoginPage() {
   return (
-    <main className="grid min-h-screen lg:grid-cols-2">
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-zinc-950 p-10 text-zinc-50 lg:flex">
+    <main className="grid min-h-screen min-w-0 bg-background lg:grid-cols-[minmax(0,1fr)_40rem]">
+      {/* 左侧：深色品牌区（大屏）——渐变底 + 细网格 + 光晕，避免纯黑平板感 */}
+      <aside className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 p-10 text-zinc-50 lg:flex">
         <div
-          className="pointer-events-none absolute inset-0 opacity-40"
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-zinc-800/25 via-transparent to-black/50"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-grid-pattern opacity-[0.11] mask-radial-fade"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-noise opacity-[0.08] mix-blend-overlay"
+        />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.65]"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 20% 10%, rgba(99,102,241,0.35), transparent 45%), radial-gradient(circle at 80% 90%, rgba(14,165,233,0.25), transparent 50%)",
+              "radial-gradient(ellipse 100% 80% at 0% 0%, rgba(99,102,241,0.22), transparent 55%), radial-gradient(ellipse 90% 70% at 100% 100%, rgba(14,165,233,0.18), transparent 50%), radial-gradient(circle at 50% 40%, rgba(250,250,250,0.03), transparent 45%)",
           }}
           aria-hidden
         />
-        <div className="relative flex items-center gap-2 text-lg font-semibold">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 backdrop-blur">
-            <Sparkles className="h-5 w-5" />
-          </div>
-          BuildTest AI
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+        >
+          <div className="animate-aurora absolute -right-32 top-1/4 h-72 w-72 rounded-full bg-gradient-to-br from-fuchsia-500/25 via-violet-500/15 to-transparent blur-3xl" />
+          <div
+            className="animate-aurora absolute bottom-1/4 -left-24 h-64 w-64 rounded-full bg-gradient-to-tr from-cyan-500/25 via-emerald-500/12 to-transparent blur-3xl"
+            style={{ animationDelay: "4s" }}
+          />
         </div>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-white/25 to-transparent"
+        />
+
+        <div className="relative flex items-center gap-3">
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-white/20 via-fuchsia-400/30 to-cyan-400/25 text-white shadow-lg ring-1 ring-white/10 animate-pulse-glow">
+            <Sparkles className="h-5 w-5 drop-shadow" aria-hidden />
+          </div>
+          <div className="flex min-w-0 flex-col leading-tight">
+            <span className="text-lg font-semibold tracking-tight">
+              BuildTest AI
+            </span>
+            <span className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-400">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              </span>
+              Online
+            </span>
+          </div>
+        </div>
+
+        <div className="relative flex flex-1 flex-col justify-center py-12">
+          <ul className="max-w-sm space-y-3">
+            {highlights.map((item) => {
+              const Icon = item.icon;
+              return (
+                <li
+                  key={item.label}
+                  className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 backdrop-blur-sm"
+                >
+                  <div
+                    className={cn(
+                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white shadow-md",
+                      item.iconBg,
+                    )}
+                  >
+                    <Icon className="h-4 w-4" aria-hidden />
+                  </div>
+                  <span className="text-sm text-zinc-300">{item.label}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
         <div className="relative space-y-3">
-          <p className="text-xl font-medium leading-relaxed">
-            让 AI 应用从&ldquo;能跑起来&rdquo;走到&ldquo;敢上线&rdquo;。
+          <p className="text-xl font-medium leading-relaxed text-zinc-50">
+            让 AI 应用从「能跑起来」走到「敢上线」。
           </p>
-          <p className="text-sm text-zinc-400">
-            面向 RAG / Agent 的开发 · 评测 · 迭代一体化平台。统一管理 Provider、知识库、Prompt 版本与评测结果。
+          <p className="text-sm leading-relaxed text-zinc-400">
+            面向 RAG / Agent 的开发 · 评测 · 迭代一体化平台。统一管理 Provider、知识库、Prompt
+            版本与评测结果。
           </p>
         </div>
       </aside>
 
-      <section className="flex items-center justify-center px-4 py-12 sm:px-8">
-        <div className="w-full max-w-sm space-y-8">
-          <div className="space-y-2 text-center lg:text-left">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              登录到 BuildTest AI
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              选择第三方账号快速登录,首次登录将自动创建账户。
-            </p>
+      {/* 右侧：浅色工作台背景，表单无卡片容器 */}
+      <section className="relative flex min-w-0 flex-col overflow-hidden">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-dot-pattern mask-fade-bottom opacity-60"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-noise opacity-[0.05] mix-blend-overlay"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+        >
+          <div className="animate-aurora absolute -right-32 -top-32 h-[22rem] w-[22rem] rounded-full bg-gradient-to-br from-primary/20 via-fuchsia-500/12 to-transparent blur-3xl" />
+          <div
+            className="animate-aurora absolute -bottom-28 -left-20 h-[20rem] w-[20rem] rounded-full bg-gradient-to-tr from-cyan-500/15 via-emerald-500/10 to-transparent blur-3xl"
+            style={{ animationDelay: "3s" }}
+          />
+        </div>
+
+        <div className="relative flex flex-1 flex-col items-center justify-center px-6 py-16 sm:px-10 sm:py-20 lg:px-32 lg:py-28">
+          <div className="w-full max-w-[17rem] space-y-8 lg:max-w-none">
+            <div className="flex items-center gap-3 lg:hidden">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary via-fuchsia-500 to-cyan-500 text-white shadow-md animate-pulse-glow">
+                <Sparkles className="h-4 w-4 drop-shadow" aria-hidden />
+              </div>
+              <div>
+                <p className="text-base font-semibold tracking-tight">
+                  BuildTest AI
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  RAG / Agent 开发 · 评测 · 迭代
+                </p>
+              </div>
+            </div>
+
+            <div className="relative space-y-7">
+              <div className="space-y-2 text-center lg:text-left">
+                <h1 className="text-2xl font-semibold tracking-tight text-ai-gradient sm:text-[1.6rem]">
+                  登录到工作台
+                </h1>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  选择第三方账号快速登录，首次登录将自动创建账户。
+                </p>
+              </div>
+
+              <Suspense
+                fallback={
+                  <div className="py-2 text-center text-sm text-muted-foreground lg:text-left">
+                    加载中…
+                  </div>
+                }
+              >
+                <LoginButtons />
+              </Suspense>
+
+              <p className="text-center text-xs leading-relaxed text-muted-foreground lg:text-left">
+                登录即表示同意{" "}
+                <span className="cursor-default underline underline-offset-4">
+                  服务条款
+                </span>{" "}
+                与{" "}
+                <span className="cursor-default underline underline-offset-4">
+                  隐私政策
+                </span>
+                。
+              </p>
+            </div>
           </div>
-
-          <Suspense
-            fallback={
-              <div className="text-sm text-muted-foreground">加载中...</div>
-            }
-          >
-            <LoginButtons />
-          </Suspense>
-
-          <p className="text-center text-xs text-muted-foreground lg:text-left">
-            登录即表示同意 <span className="underline-offset-4">服务条款</span> 与{" "}
-            <span className="underline-offset-4">隐私政策</span>。
-          </p>
         </div>
       </section>
     </main>
