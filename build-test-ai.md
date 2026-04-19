@@ -142,10 +142,14 @@ CREATE TABLE knowledge_bases (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     vector_db_config_id UUID REFERENCES vector_db_configs(id),
-    collection_name VARCHAR(255) NOT NULL,
+    collection_name VARCHAR(255) NOT NULL,      -- 系统生成,格式见附录 A.3
     embedding_model_id UUID REFERENCES models(id),
+    embedding_dimension INT NOT NULL,           -- 冗余自 models.vector_dimension,作"维度锁",见 A.3
     chunk_size INT DEFAULT 512,
     chunk_overlap INT DEFAULT 50,
+    retrieval_top_k INT DEFAULT 5,              -- 检索默认参数,可被请求体覆盖
+    retrieval_similarity_threshold FLOAT DEFAULT 0.7,
+    retrieval_config JSONB DEFAULT '{}'::jsonb, -- 预留策略版本/扩展字段(如 distance_metric、rerank 配置)
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -159,6 +163,7 @@ CREATE TABLE documents (
     file_size BIGINT,
     status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'processing', 'completed', 'failed'
     chunk_count INT DEFAULT 0,
+    error_message TEXT,                   -- status=failed 时记录原因;向量侧清理失败也写入此字段
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -265,14 +270,19 @@ DELETE /api/v1/knowledge-bases/{id}   # 删除知识库
 POST   /api/v1/knowledge-bases/{id}/documents  # 上传文档
 GET    /api/v1/knowledge-bases/{id}/documents  # 获取文档列表
 DELETE /api/v1/knowledge-bases/{id}/documents/{doc_id}  # 删除文档
-POST   /api/v1/knowledge-bases/{id}/rebuild  # 重新向量化
+POST   /api/v1/knowledge-bases/{id}/rebuild   # 重新向量化(按 KB 或按文档粒度)
+POST   /api/v1/knowledge-bases/{id}/retrieve  # Naive 向量检索(同步返回,不走 task id)
 ```
+
+> `retrieve` 请求体:`{ query: string, top_k?: int, similarity_threshold?: float }`;后两者缺省回落到 `knowledge_bases.retrieval_*` 默认值。同步响应 `{ hits: [{ document_id, chunk_index, score, text, metadata }] }`。**不要**把 `retrieve` 当作异步任务,Phase 1 直接占用请求线程;若后续引入 hybrid / rerank,在同一路径扩展请求体参数,不另起 URL。
 
 ### 4.5 Embedding 服务 (异步)
 ```
 POST   /api/v1/embedding/process     # 触发文档向量化任务
 GET    /api/v1/embedding/tasks/{task_id}  # 查询任务状态
 ```
+
+> **Phase 1 暂不暴露**:上传文档后由 `DocumentIngestService` 同步切块、向量化、upsert(与 §8 Phase 1 "Embedding 允许先同步"对齐);Phase 3 切 Celery 后再启用此两条接口,将入库链路与触发解耦。
 
 ### 4.6 Prompt 模板
 ```
@@ -316,8 +326,8 @@ POST   /api/v1/evaluations/compare   # 对比多个评测任务
 | `/dashboard` | 仪表盘 | 平台概览、快速入口、最近任务 |
 | `/providers` | Provider 管理 | 增删改查模型厂商配置 |
 | `/vector-dbs` | 向量库连接 | 先选类型(卡片展示优缺点),再填连接参数；文案数据源 `frontend/lib/vector-db-catalog.ts` |
-| `/knowledge` | 知识库列表 | 展示所有知识库，支持创建/删除 |
-| `/knowledge/[id]` | 知识库详情 | 文档上传、切片配置、向量化状态 |
+| `/knowledge-bases` | 知识库列表 | 展示所有知识库，支持创建/删除 |
+| `/knowledge-bases/[id]` | 知识库详情 | 文档上传、切片配置、向量化状态、单条试检索 |
 | `/prompts` | Prompt 模板库 | 模板列表、版本管理 |
 | `/prompts/[id]` | 模板编辑 | 变量定义、实时预览 |
 | `/datasets` | 数据集管理 | 数据集列表、导入导出 |
