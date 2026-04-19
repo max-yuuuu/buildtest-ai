@@ -48,7 +48,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/providers", label: "Provider", icon: KeyRound },
       { href: "/knowledge-bases", label: "知识库", icon: Database },
-      { href: "/vector-dbs", label: "向量库", icon: Boxes, soon: true },
+      { href: "/vector-dbs", label: "向量库", icon: Boxes },
     ],
   },
   {

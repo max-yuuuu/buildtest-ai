@@ -16,6 +16,10 @@ const pageTitles: Record<string, { title: string; description?: string }> = {
     title: "知识库",
     description: "文档上传、切片、向量化",
   },
+  "/vector-dbs": {
+    title: "向量库",
+    description: "pgvector、Qdrant 等连接与连通性测试",
+  },
 };
 
 function resolveTitle(pathname: string) {

@@ -6,6 +6,10 @@ import type {
   ProviderCreateInput,
   ProviderTestResult,
   ProviderUpdateInput,
+  VectorDbConfig,
+  VectorDbCreateInput,
+  VectorDbTestResult,
+  VectorDbUpdateInput,
 } from "./types";
 
 const BASE = "/api/backend";
@@ -63,4 +67,23 @@ export const modelApi = {
     request<void>(`/providers/${providerId}/models/${modelPk}`, {
       method: "DELETE",
     }),
+};
+
+export const vectorDbApi = {
+  list: () => request<VectorDbConfig[]>("/vector-dbs"),
+  get: (id: string) => request<VectorDbConfig>(`/vector-dbs/${id}`),
+  create: (data: VectorDbCreateInput) =>
+    request<VectorDbConfig>("/vector-dbs", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (id: string, data: VectorDbUpdateInput) =>
+    request<VectorDbConfig>(`/vector-dbs/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: string) =>
+    request<void>(`/vector-dbs/${id}`, { method: "DELETE" }),
+  test: (id: string) =>
+    request<VectorDbTestResult>(`/vector-dbs/${id}/test`, { method: "POST" }),
 };
