@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -48,6 +49,7 @@ const schema = z.object({
   ] as const),
   api_key: z.string().min(1, "必填"),
   base_url: z.string().url().optional().or(z.literal("")),
+  is_active: z.boolean(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -70,6 +72,7 @@ export function ProviderFormDialog({ open, onOpenChange, initial }: Props) {
       provider_type: "openai",
       api_key: "",
       base_url: "",
+      is_active: true,
     },
   });
 
@@ -80,6 +83,7 @@ export function ProviderFormDialog({ open, onOpenChange, initial }: Props) {
         provider_type: (initial?.provider_type as ProviderType) ?? "openai",
         api_key: "",
         base_url: initial?.base_url ?? "",
+        is_active: initial?.is_active ?? true,
       });
     }
   }, [open, initial, form]);
@@ -94,6 +98,7 @@ export function ProviderFormDialog({ open, onOpenChange, initial }: Props) {
         const update: Record<string, unknown> = {
           name: payload.name,
           base_url: payload.base_url,
+          is_active: payload.is_active,
         };
         if (payload.api_key) update.api_key = payload.api_key;
         const updated = await providerApi.update(initial.id, update);
@@ -207,6 +212,22 @@ export function ProviderFormDialog({ open, onOpenChange, initial }: Props) {
             {form.formState.errors.base_url && (
               <p className="text-xs text-destructive">URL 格式不正确</p>
             )}
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <Label htmlFor="is_active" className="text-sm font-medium">
+                启用 Provider
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                关闭后平台将视为此配置停用(仍可编辑与删除)
+              </p>
+            </div>
+            <Switch
+              id="is_active"
+              checked={form.watch("is_active")}
+              onCheckedChange={(v) => form.setValue("is_active", v)}
+            />
           </div>
 
           <DialogFooter>

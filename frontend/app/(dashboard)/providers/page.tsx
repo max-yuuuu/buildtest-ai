@@ -97,6 +97,16 @@ export default function ProvidersPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
+      providerApi.update(id, { is_active }),
+    onSuccess: (_, { is_active }) => {
+      qc.invalidateQueries({ queryKey: ["providers"] });
+      toast.success(is_active ? "已启用" : "已停用");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const total = data?.length ?? 0;
   const active = data?.filter((p) => p.is_active).length ?? 0;
   const inactive = Math.max(0, total - active);
@@ -201,10 +211,20 @@ export default function ProvidersPage() {
               <ProviderCard
                 key={p.id}
                 provider={p}
+                togglePending={
+                  toggleActiveMutation.isPending &&
+                  toggleActiveMutation.variables?.id === p.id
+                }
                 onEdit={() => {
                   setEditing(p);
                   setFormOpen(true);
                 }}
+                onToggleActive={() =>
+                  toggleActiveMutation.mutate({
+                    id: p.id,
+                    is_active: !p.is_active,
+                  })
+                }
                 onDelete={() => setDeleting(p)}
               />
             ))}
@@ -285,11 +305,15 @@ function StatTile({
 
 function ProviderCard({
   provider,
+  togglePending,
   onEdit,
+  onToggleActive,
   onDelete,
 }: {
   provider: Provider;
+  togglePending?: boolean;
   onEdit: () => void;
+  onToggleActive: () => void;
   onDelete: () => void;
 }) {
   const meta = PROVIDER_META[provider.provider_type];
@@ -337,6 +361,21 @@ function ProviderCard({
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onEdit}>编辑</DropdownMenuItem>
+              {provider.is_active ? (
+                <DropdownMenuItem
+                  disabled={togglePending}
+                  onClick={onToggleActive}
+                >
+                  停用
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  disabled={togglePending}
+                  onClick={onToggleActive}
+                >
+                  启用
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
