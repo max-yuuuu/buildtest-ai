@@ -21,8 +21,9 @@ class KnowledgeBase(Base):
         Uuid, ForeignKey("vector_db_configs.id", ondelete="RESTRICT"), nullable=False
     )
     collection_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    embedding_model_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("models.id", ondelete="RESTRICT"), nullable=False
+    # 软删时置 NULL 以释放对 models 的引用,便于取消模型登记；未删库必须非空(由业务保证)
+    embedding_model_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("models.id", ondelete="RESTRICT"), nullable=True
     )
     embedding_dimension: Mapped[int] = mapped_column(Integer, nullable=False)
     chunk_size: Mapped[int] = mapped_column(Integer, nullable=False, default=512)

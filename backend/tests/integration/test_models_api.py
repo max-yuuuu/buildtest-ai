@@ -118,6 +118,61 @@ async def test_delete_model(client, user_headers):
     assert resp.json() == []
 
 
+async def test_delete_model_blocked_when_knowledge_base_references(client, user_headers):
+    """未删库时 409；软删知识库释放引用后可 204 删除模型。"""
+    pid = await _create_provider(client, user_headers)
+    r = await client.post(
+        f"/api/v1/providers/{pid}/models",
+        json={
+            "model_id": "text-embedding-3-small",
+            "model_type": "embedding",
+            "vector_dimension": 1536,
+        },
+        headers=user_headers,
+    )
+    assert r.status_code == 201
+    mpk = r.json()["id"]
+
+    vr = await client.post(
+        "/api/v1/vector-dbs",
+        json={
+            "name": "v",
+            "db_type": "postgres_pgvector",
+            "connection_string": "postgresql://x:y@127.0.0.1:9/db",
+            "is_active": True,
+        },
+        headers=user_headers,
+    )
+    assert vr.status_code == 201
+    vid = vr.json()["id"]
+
+    kr = await client.post(
+        "/api/v1/knowledge-bases",
+        json={
+            "name": "kb",
+            "vector_db_config_id": vid,
+            "embedding_model_id": mpk,
+            "chunk_size": 200,
+            "chunk_overlap": 20,
+        },
+        headers=user_headers,
+    )
+    assert kr.status_code == 201
+
+    resp = await client.delete(f"/api/v1/providers/{pid}/models/{mpk}", headers=user_headers)
+    assert resp.status_code == 409
+    detail = resp.json()["detail"]
+    assert "知识库" in detail
+    assert "kb" in detail
+
+    # 软删知识库后释放外键,可取消模型登记
+    kb_id = kr.json()["id"]
+    del_resp = await client.delete(f"/api/v1/knowledge-bases/{kb_id}", headers=user_headers)
+    assert del_resp.status_code == 204
+    resp2 = await client.delete(f"/api/v1/providers/{pid}/models/{mpk}", headers=user_headers)
+    assert resp2.status_code == 204
+
+
 async def test_multi_tenant_isolation_returns_404(client):
     headers_a = {
         "X-User-Id": "github:user-a",

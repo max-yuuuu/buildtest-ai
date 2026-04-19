@@ -40,5 +40,6 @@ class KnowledgeBaseRepository:
     async def soft_delete(self, row: KnowledgeBase) -> None:
         from datetime import UTC, datetime
 
+        row.embedding_model_id = None
         row.deleted_at = datetime.now(UTC)
         await self.session.flush()

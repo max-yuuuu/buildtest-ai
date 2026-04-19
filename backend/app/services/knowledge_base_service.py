@@ -70,6 +70,9 @@ class KnowledgeBaseService:
         return m
 
     def _to_kb_read(self, kb: KnowledgeBase, doc_count: int = 0) -> KnowledgeBaseRead:
+        emb_id = kb.embedding_model_id
+        if emb_id is None:
+            raise HTTPException(status_code=500, detail="knowledge base missing embedding model")
         return KnowledgeBaseRead(
             id=kb.id,
             user_id=kb.user_id,
@@ -77,7 +80,7 @@ class KnowledgeBaseService:
             description=kb.description,
             vector_db_config_id=kb.vector_db_config_id,
             collection_name=kb.collection_name,
-            embedding_model_id=kb.embedding_model_id,
+            embedding_model_id=emb_id,
             embedding_dimension=kb.embedding_dimension,
             chunk_size=kb.chunk_size,
             chunk_overlap=kb.chunk_overlap,
@@ -139,6 +142,8 @@ class KnowledgeBaseService:
         kb = await self.kb_repo.get(kb_id)
         if kb is None:
             raise HTTPException(status_code=404, detail="knowledge base not found")
+        if kb.embedding_model_id is None:
+            raise HTTPException(status_code=500, detail="knowledge base missing embedding model")
         if data.embedding_model_id is not None and data.embedding_model_id != kb.embedding_model_id:
             if await self.doc_repo.count_for_kb(kb_id) > 0:
                 raise HTTPException(
@@ -237,6 +242,8 @@ class KnowledgeBaseService:
         return self._to_doc_read(doc)
 
     async def _ingest_document(self, kb: KnowledgeBase, doc: Document, file_bytes: bytes) -> None:
+        if kb.embedding_model_id is None:
+            raise HTTPException(status_code=500, detail="knowledge base missing embedding model")
         vdbc = await self._get_vdbc(kb.vector_db_config_id)
         conn = vector_connector_for_config(vdbc, self.session)
         key = _collection_key(kb, vdbc.db_type)
@@ -350,6 +357,8 @@ class KnowledgeBaseService:
 
     async def retrieve(self, kb_id: uuid.UUID, body: RetrieveRequest) -> RetrieveResponse:
         kb = await self._require_kb(kb_id)
+        if kb.embedding_model_id is None:
+            raise HTTPException(status_code=500, detail="knowledge base missing embedding model")
         vdbc = await self._get_vdbc(kb.vector_db_config_id)
         conn = vector_connector_for_config(vdbc, self.session)
         key = _collection_key(kb, vdbc.db_type)

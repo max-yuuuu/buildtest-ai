@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.knowledge_base import KnowledgeBase
 from app.models.model import Model
 from app.models.provider import Provider
 
@@ -60,3 +61,23 @@ class ModelRepository:
     async def delete(self, model: Model) -> None:
         await self.session.delete(model)
         await self.session.flush()
+
+    async def list_knowledge_base_labels_using_embedding_model(
+        self, model_pk: uuid.UUID
+    ) -> list[str]:
+        """与 FK 一致：凡 embedding_model_id 仍指向该模型的行(含软删未清空)均计入。"""
+        result = await self.session.execute(
+            select(KnowledgeBase.name, KnowledgeBase.deleted_at)
+            .where(
+                KnowledgeBase.user_id == self.user_id,
+                KnowledgeBase.embedding_model_id == model_pk,
+            )
+            .order_by(KnowledgeBase.name.asc())
+        )
+        labels: list[str] = []
+        for name, deleted_at in result.all():
+            if deleted_at is None:
+                labels.append(name)
+            else:
+                labels.append(f"{name}（已删除，仍占引用）")
+        return labels

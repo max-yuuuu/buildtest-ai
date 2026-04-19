@@ -101,8 +101,37 @@ class ModelService:
         m = await self.repo.get(model_pk)
         if m is None or m.provider_id != provider_id:
             raise HTTPException(status_code=404, detail="model not found")
-        await self.repo.delete(m)
-        await self.session.commit()
+        kb_labels = await self.repo.list_knowledge_base_labels_using_embedding_model(model_pk)
+        if kb_labels:
+            listed = "、".join(kb_labels)
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"该嵌入模型仍被以下知识库使用：{listed}。"
+                    "请在未删除的知识库中更换嵌入模型；"
+                    "若仅见「已删除仍占引用」，请重建并重启后端以执行迁移（释放软删行的外键）"
+                ),
+            )
+        try:
+            await self.repo.delete(m)
+            await self.session.commit()
+        except IntegrityError as e:
+            await self.session.rollback()
+            kb_labels = await self.repo.list_knowledge_base_labels_using_embedding_model(model_pk)
+            if kb_labels:
+                listed = "、".join(kb_labels)
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"该嵌入模型仍被以下知识库使用：{listed}。"
+                        "请在未删除的知识库中更换嵌入模型；"
+                        "若仅见「已删除仍占引用」，请重建并重启后端以执行迁移（释放软删行的外键）"
+                    ),
+                ) from e
+            raise HTTPException(
+                status_code=409,
+                detail="该嵌入模型仍被其他数据引用，无法取消登记",
+            ) from e
 
     async def list_available(self, provider_id: uuid.UUID) -> list[AvailableModel]:
         p = await self._ensure_provider(provider_id)
