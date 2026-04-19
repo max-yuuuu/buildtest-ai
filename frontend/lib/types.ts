@@ -99,3 +99,73 @@ export interface VectorDbTestResult {
   latency_ms: number;
   message: string;
 }
+
+export interface KnowledgeBase {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  vector_db_config_id: string;
+  collection_name: string;
+  embedding_model_id: string;
+  embedding_dimension: number;
+  chunk_size: number;
+  chunk_overlap: number;
+  retrieval_top_k: number;
+  retrieval_similarity_threshold: number;
+  retrieval_config: Record<string, unknown>;
+  document_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeBaseCreateInput {
+  name: string;
+  description?: string | null;
+  vector_db_config_id: string;
+  embedding_model_id: string;
+  chunk_size?: number;
+  chunk_overlap?: number;
+  retrieval_top_k?: number;
+  retrieval_similarity_threshold?: number;
+}
+
+export interface KnowledgeBaseUpdateInput {
+  name?: string;
+  description?: string | null;
+  embedding_model_id?: string;
+  chunk_size?: number;
+  chunk_overlap?: number;
+  retrieval_top_k?: number;
+  retrieval_similarity_threshold?: number;
+}
+
+export interface KbDocument {
+  id: string;
+  knowledge_base_id: string;
+  file_name: string;
+  file_type: string | null;
+  file_size: number | null;
+  status: string;
+  chunk_count: number;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RetrieveInput {
+  query: string;
+  top_k?: number;
+  similarity_threshold?: number;
+}
+
+export interface RetrieveHit {
+  document_id: string;
+  chunk_index: number;
+  text: string;
+  score: number;
+}
+
+export interface RetrieveResponse {
+  hits: RetrieveHit[];
+}

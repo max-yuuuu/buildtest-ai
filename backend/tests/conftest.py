@@ -16,8 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 @pytest_asyncio.fixture
 async def engine():
-    from app.core.database import Base
     import app.models  # noqa: F401
+    from app.core.database import Base
 
     eng = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     async with eng.begin() as conn:

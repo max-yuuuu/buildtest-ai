@@ -1,11 +1,17 @@
 import type {
   AvailableModel,
+  KnowledgeBase,
+  KnowledgeBaseCreateInput,
+  KnowledgeBaseUpdateInput,
+  KbDocument,
   Model,
   ModelCreateInput,
   Provider,
   ProviderCreateInput,
   ProviderTestResult,
   ProviderUpdateInput,
+  RetrieveInput,
+  RetrieveResponse,
   VectorDbConfig,
   VectorDbCreateInput,
   VectorDbTestResult,
@@ -86,4 +92,56 @@ export const vectorDbApi = {
     request<void>(`/vector-dbs/${id}`, { method: "DELETE" }),
   test: (id: string) =>
     request<VectorDbTestResult>(`/vector-dbs/${id}/test`, { method: "POST" }),
+};
+
+export const knowledgeBaseApi = {
+  list: () => request<KnowledgeBase[]>("/knowledge-bases"),
+  get: (id: string) => request<KnowledgeBase>(`/knowledge-bases/${id}`),
+  create: (data: KnowledgeBaseCreateInput) =>
+    request<KnowledgeBase>("/knowledge-bases", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (id: string, data: KnowledgeBaseUpdateInput) =>
+    request<KnowledgeBase>(`/knowledge-bases/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: string) =>
+    request<void>(`/knowledge-bases/${id}`, { method: "DELETE" }),
+  listDocuments: (kbId: string) =>
+    request<KbDocument[]>(`/knowledge-bases/${kbId}/documents`),
+  uploadDocument: async (kbId: string, file: File): Promise<KbDocument> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`${BASE}/knowledge-bases/${kbId}/documents`, {
+      method: "POST",
+      body: fd,
+    });
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        detail = body.detail ?? detail;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(detail);
+    }
+    return res.json() as Promise<KbDocument>;
+  },
+  retrieve: (kbId: string, data: RetrieveInput) =>
+    request<RetrieveResponse>(`/knowledge-bases/${kbId}/retrieve`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  rebuild: (kbId: string, documentId?: string) =>
+    request<void>(`/knowledge-bases/${kbId}/rebuild`, {
+      method: "POST",
+      body: JSON.stringify(documentId ? { document_id: documentId } : {}),
+    }),
+  deleteDocument: (kbId: string, docId: string) =>
+    request<void>(`/knowledge-bases/${kbId}/documents/${docId}`, {
+      method: "DELETE",
+    }),
 };
