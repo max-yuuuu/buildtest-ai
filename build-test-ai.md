@@ -493,9 +493,36 @@ volumes:
 - [x] 项目初始化，Docker 环境搭建
 - [x] 用户认证 (NextAuth + GitHub/Google)
 - [x] Provider 管理 CRUD
-- [ ] 向量库连接器 CRUD
+- [x] 向量库连接器 CRUD
 - [ ] 知识库管理 (创建/删除/上传文档)
 - [ ] Embedding 服务 (同步处理，后续改异步)
+
+#### Phase 1 补充：RAG 闭环、名词边界与演进顺序
+
+**平台内主迭代路径（目标形态，跨 Phase 衔接）**  
+开发与评测一体化依赖可复现血缘，推荐用户按下列顺序闭环；其中 **Prompt 模板、数据集、评测任务、报告对比** 在 Phase 2 落地，Phase 1 先把「知识库 + 向量化 + 向量检索」打牢。
+
+1. 选择知识库（KB）
+2. 配置检索策略与参数（Phase 1 仅 **Naive RAG**：同附录 A.2 的向量检索、`top_k`、相似度阈值等；策略预设可预留字段，实现按里程碑递进）
+3. 选择 Prompt 模板与 LLM 模型（Phase 2）
+4. 在 Playground 单条试跑、确认检索片段与答案（可与 Phase 2 并行实现，MVP 亦可先用 API 或脚本验证检索与拼装）
+5. 绑定数据集跑评测任务，持久化 `retrieved_context` 与答案（Phase 2）
+6. 调整切块、检索参数、模板版本后再跑 job，做版本对比与 Bad Case 迭代（Phase 2～3）
+
+**行业名词与实现关系**  
+Naive RAG、HyDE、Multi-Query、Parent-Document、Hybrid + Rerank、Graph RAG、Agentic RAG、Self-RAG 等，多数可视为同一套「切块 → 索引 → 检索 →（可选重排）→ 拼上下文 → 生成」pipeline 上 **索引结构、检索前改写/扩展、多路召回与重排、多步编排** 的差异，不必为每种名词单独做一套知识库 CRUD；平台侧收敛为 **可版本化的检索策略预设 + 统一执行管线**，便于同一数据集上对多次 `evaluation_jobs` 做 diff。  
+**Self-RAG** 除检索编排外，还强调 **生成过程中的自我评判**（是否再检索、答案是否 grounded 等），评测需能记录多步或轨迹后再完整产品化（与 Phase 3 Agent 编排衔接）。
+
+**Phase 1 交付边界**  
+- **必须跑通**：文档入库 → 切块与向量化 → 写入可配置向量存储 → 查询向量检索（Naive），参数行为与附录 A.2 一致。  
+- **刻意不做**：hybrid / rerank（Phase 3）、图检索、多步 Agent 闭环（参见 Phase 3 LangFlow）。
+
+**Phase 1 之后的演进顺序建议（实现与排期）**  
+1. **仅查询侧、不改索引**：Multi-Query、HyDE、query 改写（检索前增加 LLM 步骤或多路 embedding，再合并去重）。  
+2. **索引 / 切块结构**：Parent-Document、句子窗口、元数据路由（小块检索、大块回填；入库与 payload 契约升级）。  
+3. **召回与排序**：Hybrid（稀疏 + 稠密）、cross-encoder rerank（附录 A.2 已规划 Phase 3）。  
+4. **图与结构化**：Graph RAG（实体关系抽取、图存储与查询，单独里程碑）。  
+5. **编排与闭环**：Agentic RAG、Self-RAG（工具化检索、多轮决策；依赖可观测 trace，与 LangFlow 等编排层衔接）。
 
 ### Phase 2 (核心评测 - 3周)
 - [ ] Prompt 模板管理
