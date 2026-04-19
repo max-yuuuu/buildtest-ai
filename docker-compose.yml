@@ -1,14 +1,16 @@
 version: '3.9'
 
 services:
+  # 使用带 pgvector 的镜像，便于向量库「测试连接」与后续知识库
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: buildtest
       POSTGRES_PASSWORD: buildtest
       POSTGRES_DB: buildtest
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d:ro
     ports:
       - "5432:5432"
     healthcheck:
