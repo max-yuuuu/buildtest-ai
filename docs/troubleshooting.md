@@ -34,4 +34,27 @@ docker compose exec backend alembic revision --autogenerate -m "描述"
 docker compose exec backend alembic upgrade head
 ```
 
-> 注意:`docker compose up` **不会**自动跑迁移,首次启动或拉到新迁移后必须手动执行。
+> 注意:若 backend 镜像使用仓库内 `docker-entrypoint.sh`,容器启动时会先执行 `alembic upgrade head`。若未使用该入口或未重建镜像,仍需手动执行上述命令。
+
+---
+
+## 2. 向量库「测试连接」报未安装 pgvector
+
+**现象**
+
+`POST /vector-dbs/{id}/test` 返回 `ok: false`,`message` 含「未安装 pgvector 扩展」。
+
+**原因**
+
+Postgres 镜像不含 `vector` 扩展,或库从未执行过 `CREATE EXTENSION vector`。`docker-entrypoint-initdb.d` 里的脚本**仅在数据卷首次初始化**时执行;已有旧 volume 时不会自动补装。
+
+**解决**
+
+1. 确认 `docker-compose.yml` 中 `postgres` 使用 `pgvector/pgvector:pg16` 并已 `docker compose pull postgres` / 重建容器。
+2. **已有数据卷**时在 Postgres 容器内执行一次:
+
+```bash
+docker compose exec postgres psql -U buildtest -d buildtest -c "CREATE EXTENSION IF NOT EXISTS vector;"
+```
+
+然后在前端对该向量库配置再点「测试连接」。
