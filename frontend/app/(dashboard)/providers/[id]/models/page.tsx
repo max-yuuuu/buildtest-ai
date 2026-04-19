@@ -142,29 +142,27 @@ export default function ProviderModelsPage() {
         </div>
       </div>
 
-      {/* Upstream probe failure banner */}
-      {probeFailed && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-900 dark:text-amber-300">
-          <div className="font-medium">无法拉取上游模型列表</div>
-          <p className="mt-1 text-xs">
-            {(availableQ.error as Error)?.message ?? "未知错误"} —— API Key
-            或 Base URL 可能有误,可先做连通性测试再重试。
-          </p>
-        </div>
-      )}
-
       {/* Available */}
       <section className="space-y-3">
         <SectionHeader
           title="上游可用模型"
           hint="由 GET /models 拉取;已登记的会标灰"
-          count={availableQ.data?.length}
+          count={probeFailed ? undefined : availableQ.data?.length}
         />
-        {availableQ.isLoading && <ListSkeleton />}
-        {availableQ.data && availableQ.data.length === 0 && (
+        {probeFailed && (
+          <div className="rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-6 text-sm text-amber-900 dark:text-amber-300">
+            <div className="font-medium">无法拉取上游模型列表</div>
+            <p className="mt-2 text-xs leading-relaxed opacity-90">
+              {(availableQ.error as Error)?.message ?? "未知错误"} —— API Key
+              或 Base URL 可能有误,可先做连通性测试再重试。
+            </p>
+          </div>
+        )}
+        {!probeFailed && availableQ.isLoading && <ListSkeleton />}
+        {!probeFailed && availableQ.data && availableQ.data.length === 0 && (
           <EmptyHint text="上游未返回任何模型" />
         )}
-        {availableQ.data && availableQ.data.length > 0 && (
+        {!probeFailed && availableQ.data && availableQ.data.length > 0 && (
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {availableQ.data.map((m) => (
               <AvailableRow
