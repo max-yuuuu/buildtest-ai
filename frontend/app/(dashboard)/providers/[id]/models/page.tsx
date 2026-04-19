@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,12 +11,14 @@ import {
   Loader2,
   Plus,
   RefreshCw,
+  Search,
   Trash2,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,8 +40,13 @@ export default function ProviderModelsPage() {
   const qc = useQueryClient();
 
   const [registering, setRegistering] = useState<AvailableModel | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
   const [deleting, setDeleting] = useState<Model | null>(null);
   const [testing, setTesting] = useState(false);
+  const [keyword, setKeyword] = useState("");
+  const [typeFilter, setTypeFilter] = useState<
+    "all" | ModelType | "unknown"
+  >("all");
 
   const providerQ = useQuery({
     queryKey: ["provider", providerId],
@@ -87,6 +94,28 @@ export default function ProviderModelsPage() {
 
   const provider = providerQ.data;
   const probeFailed = availableQ.isError;
+
+  const filteredAvailable = useMemo(() => {
+    const list = availableQ.data ?? [];
+    const kw = keyword.trim().toLowerCase();
+    return list.filter((m) => {
+      if (kw && !m.model_id.toLowerCase().includes(kw)) return false;
+      if (typeFilter === "all") return true;
+      if (typeFilter === "unknown") return !m.suggested_type;
+      return m.suggested_type === typeFilter;
+    });
+  }, [availableQ.data, keyword, typeFilter]);
+
+  const typeCounts = useMemo(() => {
+    const list = availableQ.data ?? [];
+    const c = { all: list.length, llm: 0, embedding: 0, unknown: 0 };
+    for (const m of list) {
+      if (m.suggested_type === "llm") c.llm += 1;
+      else if (m.suggested_type === "embedding") c.embedding += 1;
+      else c.unknown += 1;
+    }
+    return c;
+  }, [availableQ.data]);
 
   return (
     <div className="space-y-5 p-4 lg:p-5">
@@ -146,15 +175,67 @@ export default function ProviderModelsPage() {
       <section className="space-y-3">
         <SectionHeader
           title="上游可用模型"
-          hint="由 GET /models 拉取;已登记的会标灰"
+          hint="由 GET /models 拉取;已登记的会标灰。上游未列出的模型(如百炼 embedding)可点「手动添加」补录"
           count={probeFailed ? undefined : availableQ.data?.length}
+          action={
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setManualOpen(true)}
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              手动添加
+            </Button>
+          }
         />
+
+        {!probeFailed && (availableQ.data?.length ?? 0) > 0 && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder="搜索 model_id…"
+                className="pl-8 h-9"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-1">
+              <FilterChip
+                active={typeFilter === "all"}
+                onClick={() => setTypeFilter("all")}
+                label="全部"
+                count={typeCounts.all}
+              />
+              <FilterChip
+                active={typeFilter === "llm"}
+                onClick={() => setTypeFilter("llm")}
+                label="llm"
+                count={typeCounts.llm}
+              />
+              <FilterChip
+                active={typeFilter === "embedding"}
+                onClick={() => setTypeFilter("embedding")}
+                label="embedding"
+                count={typeCounts.embedding}
+              />
+              <FilterChip
+                active={typeFilter === "unknown"}
+                onClick={() => setTypeFilter("unknown")}
+                label="未知"
+                count={typeCounts.unknown}
+              />
+            </div>
+          </div>
+        )}
+
         {probeFailed && (
           <div className="rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-6 text-sm text-amber-900 dark:text-amber-300">
             <div className="font-medium">无法拉取上游模型列表</div>
             <p className="mt-2 text-xs leading-relaxed opacity-90">
               {(availableQ.error as Error)?.message ?? "未知错误"} —— API Key
-              或 Base URL 可能有误,可先做连通性测试再重试。
+              或 Base URL 可能有误,可先做连通性测试再重试。也可以点「手动添加」
+              直接补录已知 model_id。
             </p>
           </div>
         )}
@@ -162,9 +243,15 @@ export default function ProviderModelsPage() {
         {!probeFailed && availableQ.data && availableQ.data.length === 0 && (
           <EmptyHint text="上游未返回任何模型" />
         )}
-        {!probeFailed && availableQ.data && availableQ.data.length > 0 && (
+        {!probeFailed &&
+          availableQ.data &&
+          availableQ.data.length > 0 &&
+          filteredAvailable.length === 0 && (
+            <EmptyHint text="没有匹配的模型,试试清空筛选或关键字" />
+          )}
+        {!probeFailed && filteredAvailable.length > 0 && (
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {availableQ.data.map((m) => (
+            {filteredAvailable.map((m) => (
               <AvailableRow
                 key={m.model_id}
                 item={m}
@@ -247,6 +334,13 @@ export default function ProviderModelsPage() {
         />
       )}
 
+      {manualOpen && (
+        <RegisterModelDialog
+          providerId={providerId}
+          onOpenChange={(v) => !v && setManualOpen(false)}
+        />
+      )}
+
       <AlertDialog
         open={!!deleting}
         onOpenChange={(v: boolean) => !v && setDeleting(null)}
@@ -317,13 +411,15 @@ function SectionHeader({
   title,
   hint,
   count,
+  action,
 }: {
   title: string;
   hint: string;
   count?: number;
+  action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-baseline justify-between">
+    <div className="flex items-baseline justify-between gap-3">
       <div>
         <h3 className="inline-flex items-center gap-2 text-base font-semibold tracking-tight">
           <Boxes className="h-4 w-4 text-muted-foreground" />
@@ -336,7 +432,38 @@ function SectionHeader({
         </h3>
         <p className="text-xs text-muted-foreground">{hint}</p>
       </div>
+      {action && <div className="shrink-0">{action}</div>}
     </div>
+  );
+}
+
+function FilterChip({
+  active,
+  onClick,
+  label,
+  count,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count: number;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={count === 0 && !active}
+      className={cn(
+        "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs transition-colors",
+        active
+          ? "border-primary/60 bg-primary/10 text-primary"
+          : "bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground",
+        count === 0 && !active && "opacity-40",
+      )}
+    >
+      <span>{label}</span>
+      <span className="font-mono text-[10px] opacity-70">{count}</span>
+    </button>
   );
 }
 

@@ -56,7 +56,8 @@ type FormParsed = z.output<typeof schema>;
 
 interface Props {
   providerId: string;
-  candidate: AvailableModel;
+  /** 传入表示"从可用列表登记",model_id 只读;不传表示"手动登记"。 */
+  candidate?: AvailableModel | null;
   onOpenChange: (v: boolean) => void;
 }
 
@@ -66,12 +67,13 @@ export function RegisterModelDialog({
   onOpenChange,
 }: Props) {
   const qc = useQueryClient();
+  const isManual = !candidate;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      model_id: candidate.model_id,
-      model_type: (candidate.suggested_type ?? "llm") as ModelType,
+      model_id: candidate?.model_id ?? "",
+      model_type: (candidate?.suggested_type ?? "llm") as ModelType,
       context_window: "",
       vector_dimension: "",
     },
@@ -100,9 +102,11 @@ export function RegisterModelDialog({
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>登记模型</DialogTitle>
+          <DialogTitle>{isManual ? "手动登记模型" : "登记模型"}</DialogTitle>
           <DialogDescription>
-            把上游模型登记到本地,知识库 / 评测任务才能绑定。
+            {isManual
+              ? "当上游 /models 未返回目标模型时(如百炼 embedding),在此手动录入 model_id。"
+              : "把上游模型登记到本地,知识库 / 评测任务才能绑定。"}{" "}
             embedding 模型必须提供向量维度。
           </DialogDescription>
         </DialogHeader>
@@ -117,10 +121,16 @@ export function RegisterModelDialog({
             <Label htmlFor="model_id">model_id</Label>
             <Input
               id="model_id"
-              readOnly
+              readOnly={!isManual}
+              placeholder={isManual ? "如 text-embedding-v4" : undefined}
               className="font-mono text-xs"
               {...form.register("model_id")}
             />
+            {form.formState.errors.model_id && (
+              <p className="text-xs text-destructive">
+                {form.formState.errors.model_id.message as string}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1">
