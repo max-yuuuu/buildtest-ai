@@ -113,4 +113,27 @@ class ModelService:
             )
         except provider_probe.ProbeError as e:
             raise HTTPException(status_code=502, detail=str(e)) from e
-        return [AvailableModel(model_id=mid, is_registered=mid in registered) for mid in upstream]
+
+        # 百炼(qwen)的 OpenAI 兼容 /models 端点不列 embedding,手动补齐常见型号,
+        # 让前端可以直接点「登记」而不必走「手动添加」。
+        if p.provider_type == "qwen":
+            for extra in ("text-embedding-v4", "text-embedding-v3"):
+                if extra not in upstream:
+                    upstream.append(extra)
+
+        return [
+            AvailableModel(
+                model_id=mid,
+                suggested_type=_infer_model_type(mid),
+                is_registered=mid in registered,
+            )
+            for mid in upstream
+        ]
+
+
+def _infer_model_type(model_id: str) -> str:
+    """按 model_id 前缀/子串推断类型。保守策略:只识别明确含 embedding 的,其余默认 llm。"""
+    lower = model_id.lower()
+    if "embedding" in lower or lower.startswith("embed-") or lower.endswith("-embed"):
+        return "embedding"
+    return "llm"
