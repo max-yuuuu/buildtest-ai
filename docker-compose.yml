@@ -69,6 +69,7 @@ services:
     volumes:
       - ./backend:/app
       - ./uploads:/app/uploads
+    entrypoint: []
     command: celery -A app.core.celery_app worker -l info
 
   frontend:
