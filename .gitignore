@@ -39,3 +39,4 @@ tmp/
 # 测试
 playwright-report/
 test-results/
+.pnpm-store/
