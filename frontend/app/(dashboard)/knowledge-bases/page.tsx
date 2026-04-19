@@ -4,10 +4,28 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Database, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowRight,
+  Boxes,
+  CircleDashed,
+  Database,
+  FileText,
+  Layers,
+  MoreHorizontal,
+  Plus,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,18 +53,33 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { knowledgeBaseApi, modelApi, providerApi, vectorDbApi } from "@/lib/api";
-import type { Model, Provider, VectorDbConfig } from "@/lib/types";
+import type { KnowledgeBase, Model, Provider, VectorDbConfig } from "@/lib/types";
+import { cn } from "@/lib/utils";
+
+const KB_GRADIENTS = [
+  { bar: "from-cyan-400 via-sky-500 to-indigo-500", ring: "ring-sky-500/20" },
+  { bar: "from-violet-400 via-purple-500 to-fuchsia-500", ring: "ring-violet-500/20" },
+  { bar: "from-emerald-400 via-teal-500 to-cyan-500", ring: "ring-emerald-500/20" },
+  { bar: "from-rose-400 via-pink-500 to-fuchsia-500", ring: "ring-rose-500/20" },
+  { bar: "from-amber-400 via-orange-500 to-rose-500", ring: "ring-amber-500/20" },
+];
+
+function pickGradient(id: string) {
+  let sum = 0;
+  for (let i = 0; i < id.length; i++) sum = (sum + id.charCodeAt(i)) % 9973;
+  return KB_GRADIENTS[sum % KB_GRADIENTS.length];
+}
 
 export default function KnowledgeBasesPage() {
   const qc = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<KnowledgeBase | null>(null);
   const [name, setName] = useState("");
   const [vectorDbId, setVectorDbId] = useState("");
   const [providerId, setProviderId] = useState("");
   const [embeddingModelId, setEmbeddingModelId] = useState("");
 
-  const { data: kbs, isLoading } = useQuery({
+  const { data: kbs, isLoading, error } = useQuery({
     queryKey: ["knowledge-bases"],
     queryFn: knowledgeBaseApi.list,
   });
@@ -77,6 +110,17 @@ export default function KnowledgeBasesPage() {
     [models],
   );
 
+  const total = kbs?.length ?? 0;
+  const docTotal = useMemo(
+    () => (kbs ?? []).reduce((acc, kb) => acc + (kb.document_count ?? 0), 0),
+    [kbs],
+  );
+  const vectorDbUsed = useMemo(() => {
+    const set = new Set<string>();
+    for (const kb of kbs ?? []) set.add(kb.vector_db_config_id);
+    return set.size;
+  }, [kbs]);
+
   const createMutation = useMutation({
     mutationFn: () =>
       knowledgeBaseApi.create({
@@ -106,21 +150,72 @@ export default function KnowledgeBasesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const openCreate = () => {
+    setCreateOpen(true);
+  };
+
   return (
     <div className="space-y-5 p-4 lg:p-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">知识库</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            绑定向量库与 Embedding 模型，上传文档并试检索
-          </p>
+      {/* Hero */}
+      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-background via-background to-muted/40 p-5 lg:p-6 ring-ai">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-noise opacity-[0.04] mix-blend-overlay"
+        />
+        <div
+          className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-gradient-to-br from-primary/20 via-fuchsia-500/10 to-transparent blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -bottom-20 -left-10 h-48 w-48 rounded-full bg-gradient-to-tr from-cyan-500/10 via-emerald-500/10 to-transparent blur-3xl"
+          aria-hidden
+        />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
+              <Sparkles className="h-3.5 w-3.5" />
+              Knowledge Bases
+            </div>
+            <h2 className="text-3xl font-semibold tracking-tight text-ai-gradient">
+              知识库管理
+            </h2>
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              绑定向量库与 Embedding 模型,上传文档自动切块向量化,
+              为 RAG 与评测任务提供可追溯的检索入口。
+            </p>
+          </div>
+          <Button size="lg" onClick={openCreate} className="shadow-sm">
+            <Plus className="mr-2 h-4 w-4" />
+            新建知识库
+          </Button>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          新建
-        </Button>
+
+        <div className="relative mt-6 grid gap-3 sm:grid-cols-3">
+          <StatTile
+            label="知识库总数"
+            value={total}
+            hint="已创建的知识库"
+            icon={<Database className="h-4 w-4" />}
+            accent="bg-primary/10 text-primary"
+          />
+          <StatTile
+            label="文档总数"
+            value={docTotal}
+            hint="累计入库文档"
+            icon={<FileText className="h-4 w-4" />}
+            accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+          />
+          <StatTile
+            label="向量库"
+            value={vectorDbUsed}
+            hint="被引用的存储后端"
+            icon={<Layers className="h-4 w-4" />}
+            accent="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
+          />
+        </div>
       </div>
 
+      {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -133,7 +228,7 @@ export default function KnowledgeBasesPage() {
                 id="kb-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="例如：产品手册"
+                placeholder="例如:产品手册"
               />
             </div>
             <div className="space-y-2">
@@ -174,12 +269,12 @@ export default function KnowledgeBasesPage() {
                 disabled={!providerId}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="选择已注册的 embedding 模型" />
+                  <SelectValue placeholder="选择已登记的 embedding 模型" />
                 </SelectTrigger>
                 <SelectContent>
                   {embeddingModels.map((m: Model) => (
                     <SelectItem key={m.id} value={m.id}>
-                      {m.model_id}（{m.vector_dimension} 维）
+                      {m.model_id}({m.vector_dimension} 维)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -205,69 +300,306 @@ export default function KnowledgeBasesPage() {
         </DialogContent>
       </Dialog>
 
-      <div className="rounded-xl border border-border/60 bg-card/40 shadow-sm">
-        {isLoading ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">加载中…</div>
-        ) : !kbs?.length ? (
-          <div className="flex flex-col items-center gap-3 p-10 text-center">
-            <Database className="h-10 w-10 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">暂无知识库，点击「新建」开始</p>
+      {/* List */}
+      <section className="space-y-4">
+        <div className="flex items-baseline justify-between">
+          <div>
+            <h3 className="text-base font-semibold tracking-tight">
+              所有知识库
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              点击卡片进入详情,管理文档与试检索
+            </p>
           </div>
-        ) : (
-          <ul className="divide-y divide-border/60">
-            {kbs.map((kb) => (
-              <li key={kb.id} className="flex items-center gap-4 px-4 py-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Database className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <Link
-                    href={`/knowledge-bases/${kb.id}` as Route}
-                    className="font-medium hover:text-primary hover:underline"
-                  >
-                    {kb.name}
-                  </Link>
-                  <div className="mt-0.5 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    <span>维度 {kb.embedding_dimension}</span>
-                    <span>·</span>
-                    <span className="font-mono truncate">{kb.collection_name}</span>
-                  </div>
-                </div>
-                <Badge variant="secondary">{kb.document_count} 文档</Badge>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-destructive"
-                  onClick={() => setDeleting(kb.id)}
-                  aria-label="删除"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+          {kbs && kbs.length > 0 && (
+            <span className="text-xs text-muted-foreground">
+              共 {total} 项 · {docTotal} 文档
+            </span>
+          )}
+        </div>
 
-      <AlertDialog open={!!deleting} onOpenChange={() => setDeleting(null)}>
+        {isLoading && <KbGridSkeleton />}
+
+        {error && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">
+            加载失败:{(error as Error).message}
+          </div>
+        )}
+
+        {kbs && kbs.length === 0 && <EmptyState onCreate={openCreate} />}
+
+        {kbs && kbs.length > 0 && (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {kbs.map((kb) => (
+              <KnowledgeBaseCard
+                key={kb.id}
+                kb={kb}
+                onDelete={() => setDeleting(kb)}
+              />
+            ))}
+            <AddKbCard onClick={openCreate} />
+          </div>
+        )}
+      </section>
+
+      <AlertDialog
+        open={!!deleting}
+        onOpenChange={(v: boolean) => !v && setDeleting(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>删除知识库？</AlertDialogTitle>
+            <AlertDialogTitle>删除知识库?</AlertDialogTitle>
             <AlertDialogDescription>
-              将软删除知识库及文档索引，操作不可撤销。
+              将软删除知识库 “{deleting?.name}” 及其文档索引,操作不可撤销。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleting && deleteMutation.mutate(deleting)}
+              onClick={() => deleting && deleteMutation.mutate(deleting.id)}
             >
               删除
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  hint,
+  icon,
+  accent,
+}: {
+  label: string;
+  value: number;
+  hint: string;
+  icon: React.ReactNode;
+  accent: string;
+}) {
+  return (
+    <div className="rounded-xl border bg-card/60 p-4 backdrop-blur-sm">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <span
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-lg",
+            accent,
+          )}
+        >
+          {icon}
+        </span>
+      </div>
+      <div className="mt-3 flex items-baseline gap-2">
+        <span className="text-3xl font-semibold tracking-tight tabular-nums">
+          {value}
+        </span>
+        <span className="text-xs text-muted-foreground">{hint}</span>
+      </div>
+    </div>
+  );
+}
+
+function KnowledgeBaseCard({
+  kb,
+  onDelete,
+}: {
+  kb: KnowledgeBase;
+  onDelete: () => void;
+}) {
+  const meta = pickGradient(kb.id);
+  const detailHref = `/knowledge-bases/${kb.id}` as Route;
+  return (
+    <div
+      className={cn(
+        "group relative overflow-hidden rounded-xl border bg-card transition-all",
+        "hover:-translate-y-0.5 hover:shadow-lg hover:ring-1",
+        meta.ring,
+      )}
+    >
+      <div className={cn("h-1 w-full bg-gradient-to-r", meta.bar)} />
+
+      <Link
+        href={detailHref}
+        className="absolute inset-0 z-10"
+        aria-label={`查看 ${kb.name}`}
+      />
+
+      <div className="relative space-y-4 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div
+              className={cn(
+                "flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm",
+                meta.bar,
+              )}
+            >
+              <Database className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{kb.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {kb.embedding_dimension} 维 · chunk {kb.chunk_size}
+              </p>
+            </div>
+          </div>
+
+          <div className="relative z-20">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuItem asChild>
+                  <Link href={detailHref}>管理文档</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={onDelete}
+                >
+                  删除
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Row icon={<Boxes className="h-3.5 w-3.5" />} label="collection">
+            <code className="truncate font-mono text-xs text-foreground/80">
+              {kb.collection_name}
+            </code>
+          </Row>
+          <Row icon={<FileText className="h-3.5 w-3.5" />} label="检索">
+            <span className="text-xs text-muted-foreground">
+              top_k {kb.retrieval_top_k} · 阈值{" "}
+              {kb.retrieval_similarity_threshold}
+            </span>
+          </Row>
+        </div>
+
+        <div className="flex items-center justify-between border-t pt-3">
+          <Badge
+            variant="secondary"
+            className="gap-1.5 bg-primary/10 text-primary hover:bg-primary/15"
+          >
+            <FileText className="h-3 w-3" />
+            {kb.document_count} 文档
+          </Badge>
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
+            <Upload className="h-3.5 w-3.5" />
+            管理文档
+            <ArrowRight className="h-3 w-3" />
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Row({
+  icon,
+  label,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+        {icon}
+      </span>
+      <span className="w-16 shrink-0 text-muted-foreground">{label}</span>
+      <div className="min-w-0 flex-1 truncate">{children}</div>
+    </div>
+  );
+}
+
+function AddKbCard({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "group flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-xl",
+        "border-2 border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground",
+        "transition-all hover:border-primary/50 hover:bg-primary/5 hover:text-primary",
+      )}
+    >
+      <div className="flex h-10 w-10 items-center justify-center rounded-full border border-dashed transition-colors group-hover:border-primary/50 group-hover:bg-primary/10">
+        <Plus className="h-5 w-5" />
+      </div>
+      <span className="font-medium">新建知识库</span>
+      <span className="text-xs text-muted-foreground/80">
+        向量库 + Embedding 模型
+      </span>
+    </button>
+  );
+}
+
+function EmptyState({ onCreate }: { onCreate: () => void }) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl border bg-card p-12 text-center">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-primary/5 to-transparent"
+        aria-hidden
+      />
+      <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 via-fuchsia-500/10 to-cyan-500/20">
+        <Database className="h-7 w-7 text-primary" />
+      </div>
+      <h3 className="relative mt-5 text-base font-semibold">
+        还没有创建任何知识库
+      </h3>
+      <p className="relative mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
+        创建一个知识库,就能上传文档、向量化并在评测任务里用起来。
+      </p>
+      <Button onClick={onCreate} className="relative mt-6">
+        <Plus className="mr-2 h-4 w-4" />
+        创建第一个知识库
+      </Button>
+    </div>
+  );
+}
+
+function KbGridSkeleton() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div
+          key={i}
+          className="flex min-h-[200px] flex-col gap-4 rounded-xl border bg-card p-5"
+        >
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 animate-pulse rounded-xl bg-muted" />
+            <div className="space-y-2">
+              <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+              <div className="h-2.5 w-16 animate-pulse rounded bg-muted/70" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="h-3 w-full animate-pulse rounded bg-muted/70" />
+            <div className="h-3 w-2/3 animate-pulse rounded bg-muted/70" />
+          </div>
+          <div className="mt-auto flex items-center gap-2 pt-2">
+            <CircleDashed className="h-3.5 w-3.5 text-muted-foreground/40" />
+            <span className="text-xs text-muted-foreground/60">加载中…</span>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
