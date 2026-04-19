@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { Button } from "@/components/ui/button";
@@ -38,21 +38,22 @@ const PROVIDER_TYPES: ProviderType[] = [
   "qwen",
 ];
 
-const schema = z.object({
-  name: z.string().min(1, "必填").max(100),
-  provider_type: z.enum([
-    "openai",
-    "anthropic",
-    "azure",
-    "zhipu",
-    "qwen",
-  ] as const),
-  api_key: z.string().min(1, "必填"),
-  base_url: z.string().url().optional().or(z.literal("")),
-  is_active: z.boolean(),
-});
+const buildSchema = (isEdit: boolean) =>
+  z.object({
+    name: z.string().min(1, "必填").max(100),
+    provider_type: z.enum([
+      "openai",
+      "anthropic",
+      "azure",
+      "zhipu",
+      "qwen",
+    ] as const),
+    api_key: isEdit ? z.string().optional() : z.string().min(1, "必填"),
+    base_url: z.string().url().optional().or(z.literal("")),
+    is_active: z.boolean(),
+  });
 
-type FormValues = z.infer<typeof schema>;
+type FormValues = z.infer<ReturnType<typeof buildSchema>>;
 
 interface Props {
   open: boolean;
@@ -64,6 +65,7 @@ export function ProviderFormDialog({ open, onOpenChange, initial }: Props) {
   const qc = useQueryClient();
   const router = useRouter();
   const isEdit = !!initial;
+  const schema = useMemo(() => buildSchema(isEdit), [isEdit]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -90,21 +92,25 @@ export function ProviderFormDialog({ open, onOpenChange, initial }: Props) {
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
-      const payload = {
-        ...values,
-        base_url: values.base_url || null,
-      };
+      const base_url = values.base_url || null;
       if (isEdit && initial) {
         const update: Record<string, unknown> = {
-          name: payload.name,
-          base_url: payload.base_url,
-          is_active: payload.is_active,
+          name: values.name,
+          base_url,
+          is_active: values.is_active,
         };
-        if (payload.api_key) update.api_key = payload.api_key;
+        if (values.api_key) update.api_key = values.api_key;
         const updated = await providerApi.update(initial.id, update);
         return { provider: updated, isCreate: false };
       }
-      const created = await providerApi.create(payload);
+      // create 分支 schema 已经强制 api_key 非空,断言给 TS
+      const created = await providerApi.create({
+        name: values.name,
+        provider_type: values.provider_type,
+        api_key: values.api_key as string,
+        base_url,
+        is_active: values.is_active,
+      });
       return { provider: created, isCreate: true };
     },
     onSuccess: async ({ provider, isCreate }) => {
