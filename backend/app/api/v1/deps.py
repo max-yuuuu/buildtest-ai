@@ -1,3 +1,4 @@
+import base64
 import uuid
 
 from fastapi import Depends, Header, HTTPException
@@ -6,6 +7,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.repositories.user import UserRepository
 from app.schemas.user import UserUpsert
+
+
+def _decode_x_user_name(value: str | None) -> str | None:
+    """解码 BFF 注入的 ``b64.<Base64URL(UTF-8)>``；无前缀则明文兼容测试。"""
+    if value is None or value == "":
+        return None
+    if value.startswith("b64."):
+        raw = value[4:]
+        pad = "=" * (-len(raw) % 4)
+        return base64.urlsafe_b64decode(raw + pad).decode("utf-8")
+    return value
 
 
 async def get_session() -> AsyncSession:
@@ -29,7 +41,7 @@ async def get_current_user_id(
         UserUpsert(
             external_id=x_user_id,
             email=x_user_email or f"{x_user_id}@placeholder.local",
-            name=x_user_name,
+            name=_decode_x_user_name(x_user_name),
             avatar_url=None,
         )
     )

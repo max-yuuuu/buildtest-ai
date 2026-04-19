@@ -71,9 +71,9 @@ function initials(value?: string | null) {
   if (!value) return "U";
   const trimmed = value.trim();
   if (!trimmed) return "U";
-  const parts = trimmed.split(/\s+/);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return trimmed.slice(0, 2).toUpperCase();
+  const first = trimmed.codePointAt(0);
+  if (first === undefined) return "U";
+  return String.fromCodePoint(first).toUpperCase();
 }
 
 export function Sidebar() {
