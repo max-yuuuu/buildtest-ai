@@ -43,6 +43,7 @@ export interface Model {
   model_type: ModelType;
   context_window: number | null;
   vector_dimension: number | null;
+  embedding_batch_size: number | null;
   created_at: string;
 }
 
@@ -57,6 +58,14 @@ export interface ModelCreateInput {
   model_type: ModelType;
   context_window?: number | null;
   vector_dimension?: number | null;
+  embedding_batch_size?: number | null;
+}
+
+export interface ModelUpdateInput {
+  model_type?: ModelType;
+  context_window?: number | null;
+  vector_dimension?: number | null;
+  embedding_batch_size?: number | null;
 }
 
 export type VectorDbType =

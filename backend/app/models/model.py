@@ -30,5 +30,8 @@ class Model(Base):
     model_type: Mapped[str] = mapped_column(String(50), nullable=False)
     context_window: Mapped[int | None] = mapped_column(Integer, nullable=True)
     vector_dimension: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # embedding 接口单次 input 条数上限;None 表示使用 client 默认(64)。
+    # 例:阿里云 DashScope text-embedding-v3/v4 硬限 10,OpenAI 可到 2048。
+    embedding_batch_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

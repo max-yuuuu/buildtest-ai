@@ -14,6 +14,7 @@ class ModelBase(BaseModel):
     model_type: ModelType
     context_window: int | None = Field(default=None, gt=0)
     vector_dimension: int | None = Field(default=None, gt=0)
+    embedding_batch_size: int | None = Field(default=None, gt=0, le=2048)
 
 
 class ModelCreate(ModelBase):
@@ -23,6 +24,12 @@ class ModelCreate(ModelBase):
             raise ValueError("vector_dimension is required for embedding models")
         return self
 
+    @model_validator(mode="after")
+    def _batch_size_only_for_embedding(self) -> "ModelCreate":
+        if self.model_type != "embedding" and self.embedding_batch_size is not None:
+            raise ValueError("embedding_batch_size is only valid for embedding models")
+        return self
+
 
 class ModelUpdate(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
@@ -30,6 +37,7 @@ class ModelUpdate(BaseModel):
     model_type: ModelType | None = None
     context_window: int | None = Field(default=None, gt=0)
     vector_dimension: int | None = Field(default=None, gt=0)
+    embedding_batch_size: int | None = Field(default=None, gt=0, le=2048)
 
 
 class ModelRead(ModelBase):

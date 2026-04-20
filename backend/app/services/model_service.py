@@ -30,6 +30,7 @@ class ModelService:
             model_type=m.model_type,  # type: ignore[arg-type]
             context_window=m.context_window,
             vector_dimension=m.vector_dimension,
+            embedding_batch_size=m.embedding_batch_size,
             created_at=m.created_at,
         )
 
@@ -63,6 +64,7 @@ class ModelService:
             model_type=data.model_type,
             context_window=data.context_window,
             vector_dimension=data.vector_dimension,
+            embedding_batch_size=data.embedding_batch_size,
         )
         try:
             await self.repo.create(m)
@@ -86,12 +88,17 @@ class ModelService:
             m.context_window = data.context_window
         if data.vector_dimension is not None:
             m.vector_dimension = data.vector_dimension
+        if data.embedding_batch_size is not None:
+            m.embedding_batch_size = data.embedding_batch_size
         # embedding 仍需保证 vector_dimension:改为 embedding 时若无维度则拒绝
         if m.model_type == "embedding" and m.vector_dimension is None:
             await self.session.rollback()
             raise HTTPException(
                 status_code=422, detail="vector_dimension is required for embedding models"
             )
+        # batch_size 仅 embedding 模型有意义;改为非 embedding 时顺带清空,避免字段语义漂移
+        if m.model_type != "embedding" and m.embedding_batch_size is not None:
+            m.embedding_batch_size = None
         await self.session.commit()
         await self.session.refresh(m)
         return self._to_read(m)

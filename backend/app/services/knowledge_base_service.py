@@ -286,6 +286,7 @@ class KnowledgeBaseService:
                 base_url=p.base_url,
                 model_id=m.model_id,
                 texts=chunks,
+                batch_size=m.embedding_batch_size,
             )
             for vec in vectors:
                 if len(vec) != kb.embedding_dimension:
@@ -387,6 +388,7 @@ class KnowledgeBaseService:
                 base_url=p.base_url,
                 model_id=m.model_id,
                 texts=[body.query],
+                batch_size=m.embedding_batch_size,
             )
         )[0]
         if len(qv) != kb.embedding_dimension:

@@ -6,6 +6,7 @@ import type {
   KbDocument,
   Model,
   ModelCreateInput,
+  ModelUpdateInput,
   Provider,
   ProviderCreateInput,
   ProviderTestResult,
@@ -67,6 +68,11 @@ export const modelApi = {
   create: (providerId: string, data: ModelCreateInput) =>
     request<Model>(`/providers/${providerId}/models`, {
       method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (providerId: string, modelPk: string, data: ModelUpdateInput) =>
+    request<Model>(`/providers/${providerId}/models/${modelPk}`, {
+      method: "PUT",
       body: JSON.stringify(data),
     }),
   delete: (providerId: string, modelPk: string) =>

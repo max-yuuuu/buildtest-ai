@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+DEFAULT_BATCH_SIZE = 64
+
 
 class EmbeddingError(Exception):
     pass
@@ -14,6 +16,7 @@ async def embed_texts(
     base_url: str | None,
     model_id: str,
     texts: list[str],
+    batch_size: int | None = None,
 ) -> list[list[float]]:
     if provider_type not in ("openai", "azure"):
         raise EmbeddingError(f"embedding 尚未支持 provider_type={provider_type}")
@@ -26,7 +29,7 @@ async def embed_texts(
     client = AsyncOpenAI(api_key=api_key, base_url=base_url or None, timeout=60.0)
     effective_url = base_url or "https://api.openai.com/v1"
     out: list[list[float]] = []
-    batch = 64
+    batch = batch_size if batch_size and batch_size > 0 else DEFAULT_BATCH_SIZE
     try:
         for i in range(0, len(texts), batch):
             chunk = texts[i : i + batch]

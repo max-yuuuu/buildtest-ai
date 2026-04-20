@@ -9,6 +9,7 @@ import {
   Boxes,
   CheckCircle2,
   Loader2,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -41,6 +42,7 @@ export default function ProviderModelsPage() {
 
   const [registering, setRegistering] = useState<AvailableModel | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
+  const [editing, setEditing] = useState<Model | null>(null);
   const [deleting, setDeleting] = useState<Model | null>(null);
   const [testing, setTesting] = useState(false);
   const [keyword, setKeyword] = useState("");
@@ -308,15 +310,26 @@ export default function ProviderModelsPage() {
                           : "—"}
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeleting(m)}
-                        className="h-7 text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="mr-1 h-3.5 w-3.5" />
-                        取消登记
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditing(m)}
+                          className="h-7"
+                        >
+                          <Pencil className="mr-1 h-3.5 w-3.5" />
+                          编辑
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeleting(m)}
+                          className="h-7 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="mr-1 h-3.5 w-3.5" />
+                          取消登记
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -338,6 +351,14 @@ export default function ProviderModelsPage() {
         <RegisterModelDialog
           providerId={providerId}
           onOpenChange={(v) => !v && setManualOpen(false)}
+        />
+      )}
+
+      {editing && (
+        <RegisterModelDialog
+          providerId={providerId}
+          editing={editing}
+          onOpenChange={(v) => !v && setEditing(null)}
         />
       )}
 
