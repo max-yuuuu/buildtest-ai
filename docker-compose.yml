@@ -44,6 +44,10 @@ services:
       DATABASE_URL: postgresql+asyncpg://buildtest:buildtest@postgres:5432/buildtest
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
+    dns:
+      - 223.5.5.5
+      - 119.29.29.29
+      - 8.8.8.8
     ports:
       - "8000:8000"
     depends_on:
@@ -63,6 +67,10 @@ services:
       DATABASE_URL: postgresql+asyncpg://buildtest:buildtest@postgres:5432/buildtest
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
+    dns:
+      - 223.5.5.5
+      - 119.29.29.29
+      - 8.8.8.8
     depends_on:
       - backend
       - redis
