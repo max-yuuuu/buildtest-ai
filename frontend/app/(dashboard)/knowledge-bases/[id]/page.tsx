@@ -192,7 +192,7 @@ export default function KnowledgeBaseDetailPage() {
           type="file"
           hidden
           onChange={handleFileChange}
-          accept=".txt,.md,.pdf,.docx"
+          accept=".txt,.md,.pdf,.doc,.docx"
         />
       </div>
 
@@ -266,7 +266,7 @@ export default function KnowledgeBaseDetailPage() {
         <SectionHeader
           icon={<FileText className="h-4 w-4 text-muted-foreground" />}
           title="文档"
-          hint="支持 txt / md / pdf / docx;上传后自动切块并向量化"
+          hint="支持 txt / md / pdf / doc / docx;上传后自动切块并向量化"
           count={docs?.length}
           action={
             <Button size="sm" variant="outline" onClick={triggerUpload}>
@@ -293,7 +293,7 @@ export default function KnowledgeBaseDetailPage() {
             </div>
             <span className="font-medium">点击上传第一份文档</span>
             <span className="text-xs text-muted-foreground/80">
-              txt · md · pdf · docx
+              txt · md · pdf · doc · docx
             </span>
           </button>
         ) : (

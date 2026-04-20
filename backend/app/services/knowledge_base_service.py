@@ -261,14 +261,22 @@ class KnowledgeBaseService:
             from langchain_text_splitters import RecursiveCharacterTextSplitter
 
             text = extract_text(file_name=doc.file_name or "x.txt", data=file_bytes)
+            if not text.strip():
+                doc.status = "failed"
+                doc.chunk_count = 0
+                doc.error_message = "未抽取到文本内容，请确认文件不是扫描件或已损坏"
+                await conn.delete_by_document(key, doc.id)
+                await self.session.commit()
+                return
             splitter = RecursiveCharacterTextSplitter(
                 chunk_size=kb.chunk_size,
                 chunk_overlap=kb.chunk_overlap,
             )
-            chunks = splitter.split_text(text) if text.strip() else []
+            chunks = splitter.split_text(text)
             if not chunks:
-                doc.status = "completed"
+                doc.status = "failed"
                 doc.chunk_count = 0
+                doc.error_message = "切块结果为空"
                 await conn.delete_by_document(key, doc.id)
                 await self.session.commit()
                 return
