@@ -23,16 +23,19 @@ async function proxy(req: NextRequest, pathParts: string[]) {
 
   const body = ["GET", "HEAD"].includes(req.method)
     ? undefined
-    : await req.text();
+    : await req.arrayBuffer();
+
+  const headers: Record<string, string> = {
+    "X-User-Id": (session.user as { id?: string }).id ?? "",
+    "X-User-Email": session.user.email ?? "",
+    "X-User-Name": xUserNameHeaderValue(session.user.name),
+  };
+  const ct = req.headers.get("content-type");
+  if (ct) headers["Content-Type"] = ct;
 
   const upstream = await fetch(url, {
     method: req.method,
-    headers: {
-      "Content-Type": req.headers.get("content-type") ?? "application/json",
-      "X-User-Id": (session.user as { id?: string }).id ?? "",
-      "X-User-Email": session.user.email ?? "",
-      "X-User-Name": xUserNameHeaderValue(session.user.name),
-    },
+    headers,
     body,
   });
 
