@@ -56,7 +56,9 @@
 开发环境默认用 Docker Compose 起本地 Qdrant,无需外部 key;生产环境才要云托管 key。
 
 ### 3.1 Qdrant(本地 Docker)**[必需 — Docker 自动]**
-- `QDRANT_URL=http://qdrant:6333`
+- `QDRANT_URL`：
+  - docker 内访问：`http://qdrant:6333`
+  - 本机进程访问：`http://localhost:6333`
 - `QDRANT_API_KEY=`(本地留空)
 
 ### 3.2 Qdrant Cloud / Milvus Cloud **[稍后]**
@@ -70,10 +72,14 @@
 由 docker-compose 本地拉起,开发无需你准备,仅列出变量供参考。
 
 ### 4.1 PostgreSQL
-- `DATABASE_URL=postgresql+asyncpg://buildtest:buildtest@postgres:5432/buildtest`
+- `DATABASE_URL`：
+  - docker 内访问：`postgresql+asyncpg://buildtest:buildtest@postgres:5432/buildtest`
+  - 本机进程访问：`postgresql+asyncpg://buildtest:buildtest@localhost:5432/buildtest`
 
 ### 4.2 Redis(Celery broker/backend)
-- `REDIS_URL=redis://redis:6379/0`
+- `REDIS_URL`：
+  - docker 内访问：`redis://redis:6379/0`
+  - 本机进程访问：`redis://localhost:6379/0`
 
 ---
 

@@ -84,6 +84,157 @@ buildtest-ai/
 └── README.md
 ```
 
+## 2.1 本地开发模式与切换（推荐）
+
+目标：让你在本地开发时 **不必用 Docker 跑前后端**，但仍可用 Docker 提供 Postgres / Redis / Qdrant 等基础设施；同时支持灵活组合：
+
+- **全 Docker 模式**：前端/后端/worker/基础设施全部 docker compose 跑（最接近部署环境）
+- **前端本地模式**：前端本地跑；后端/worker/基础设施可 docker 跑
+- **后端本地模式**：后端（+可选 worker）本地跑；前端/基础设施可 docker 跑
+- **全本地应用模式**：前端 + 后端都本地跑；基础设施 docker 跑
+
+### 2.1.1 关键约定：Docker 网络名 vs localhost
+
+本项目的 `.env.example` 默认是 docker compose 语义（如 `postgres`、`redis`、`qdrant`、`backend` 这类 **容器网络服务名**）。当某个组件改为本机进程启动时：
+
+- **该组件访问基础设施**：要用 `localhost:<port>`（例如 `postgresql://...@localhost:5432/...`、`redis://localhost:6379/...`、`http://localhost:6333`）
+- **docker 内组件访问基础设施**：继续使用 compose 服务名（例如 `postgres:5432`、`redis:6379`、`qdrant:6333`）
+
+因此“切换模式”的核心不是改代码，而是**按启动位置选择不同的 env 值**。
+
+### 2.1.2 推荐做法：不改 `.env`，用命令行覆盖
+
+后端配置由 `backend/app/core/config.py` 读取环境变量（默认读取根目录 `.env`），前端 BFF 代理由 `frontend/app/api/backend/[...path]/route.ts` 读取 `BACKEND_URL`。
+
+为避免在两种模式间来回手改 `.env`（且 `.env` 往往包含密钥），推荐用命令行覆盖关键变量：
+
+- 后端本机跑时覆盖：`DATABASE_URL/REDIS_URL/CELERY_*/QDRANT_URL/UPLOAD_DIR`
+- 前端本机跑时覆盖：`BACKEND_URL`
+
+### 2.1.3 新增：仅基础设施 compose 文件
+
+仓库新增 `docker-compose.infra.yml`，只包含：
+
+- `postgres`（5432）
+- `redis`（6379）
+- `qdrant`（6333/6334）
+
+它用于“应用本地跑、基础设施 docker 跑”的场景。
+
+---
+
+## 2.2 启动方式（按场景）
+
+下面命令均在仓库根目录执行（除非特别说明）。
+
+### 2.2.0 后端使用 uv 管理（本机开发推荐）
+
+后端目录包含 `uv.lock`，推荐用 **uv** 统一管理 Python 版本与依赖：
+
+- 安装/检查：`uv --version`
+- 安装 Python：`uv python install 3.12`
+- 创建虚拟环境：`uv venv`
+- 安装依赖：`uv pip install -r requirements.txt`
+- 运行命令：`uv run <cmd>`
+
+> 说明：当前后端依赖来源是 `requirements.txt`（未在 `pyproject.toml` 声明 project dependencies），因此这里用 `uv pip install -r requirements.txt` 来安装依赖。
+
+### A. 全 Docker 模式（最省心）
+
+```bash
+docker compose up --build
+```
+
+- 前端：`http://localhost:3000`
+- 后端：`http://localhost:8000`
+
+### B. 前端本地 + 后端 docker（前端开发常用）
+
+1) 起后端与基础设施（docker）：
+
+```bash
+docker compose up -d postgres redis qdrant backend celery-worker
+```
+
+2) 本机起前端（把 BFF 指到本机可访问的后端端口）：
+
+```bash
+cd frontend
+pnpm install
+BACKEND_URL="http://localhost:8000" pnpm dev
+```
+
+> 说明：此时后端跑在 docker，但对本机暴露 `8000:8000`，所以前端用 `localhost:8000` 即可。
+
+### C. 后端本地 + 前端 docker（后端开发常用）
+
+1) 起基础设施（docker）：
+
+```bash
+docker compose -f docker-compose.infra.yml up -d
+```
+
+2) 本机起后端（连接 localhost 基础设施）：
+
+```bash
+cd backend
+uv python install 3.12
+uv venv
+uv pip install -r requirements.txt
+
+DATABASE_URL="postgresql+asyncpg://buildtest:buildtest@localhost:5432/buildtest" \
+REDIS_URL="redis://localhost:6379/0" \
+CELERY_BROKER_URL="redis://localhost:6379/0" \
+CELERY_RESULT_BACKEND="redis://localhost:6379/1" \
+QDRANT_URL="http://localhost:6333" \
+UPLOAD_DIR="./uploads" \
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+3) 起前端（docker）并让其访问本机后端：
+
+```bash
+BACKEND_URL="http://host.docker.internal:8000" docker compose up -d frontend
+```
+
+> 说明：Mac/Windows 的 Docker 默认支持 `host.docker.internal` 访问宿主机；Linux 可能需要额外配置。
+
+### D. 前端本地 + 后端本地 + 基础设施 docker（推荐默认）
+
+1) 起基础设施（docker）：
+
+```bash
+docker compose -f docker-compose.infra.yml up -d
+```
+
+2) 本机起后端（同上 C.2）  
+3) 本机起前端：
+
+```bash
+cd frontend
+pnpm install
+BACKEND_URL="http://localhost:8000" pnpm dev
+```
+
+### E. Celery worker 是否本地跑？
+
+worker 建议与后端同一侧启动（都本地或都 docker），否则也需要做与上面同样的网络地址切换：
+
+- worker 在 docker：用 `redis://redis:6379/...`、`postgresql://...@postgres:5432/...`
+- worker 在本机：用 `redis://localhost:6379/...`、`postgresql://...@localhost:5432/...`
+
+---
+
+## 2.3 常见问题（FAQ）
+
+### 2.3.1 为什么不能同时用 `postgres:5432` 和 `localhost:5432`？
+
+`postgres` 是 docker compose 网络里的服务名，只能被同一网络内的容器解析；本机进程只能用 `localhost` 访问映射端口（例如 `5432:5432`）。
+
+### 2.3.2 上传目录 `UPLOAD_DIR` 要怎么配？
+
+默认值 `/app/uploads` 是容器内路径。本机启动后端时建议设置为仓库内相对路径（如 `UPLOAD_DIR="./uploads"` 或 `UPLOAD_DIR="../uploads"`），以保证写入路径存在且可读写。
+
 ## 3. 数据库表结构设计
 
 ### 3.1 核心表清单
