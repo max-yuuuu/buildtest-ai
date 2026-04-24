@@ -1,0 +1,7 @@
+# Backend runs on host; infra runs in docker and is exposed to localhost.
+DATABASE_URL=postgresql+asyncpg://buildtest:buildtest@localhost:5432/buildtest
+REDIS_URL=redis://localhost:6379/0
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/1
+QDRANT_URL=http://localhost:6333
+

@@ -1,0 +1,268 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+INFRA_COMPOSE_FILE="${ROOT_DIR}/docker-compose.infra.yml"
+FULL_COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml"
+
+info() { printf '%s\n' "$*"; }
+err() { printf '%s\n' "$*" >&2; }
+
+usage() {
+  cat <<'EOF'
+Usage:
+  scripts/dev <command> [args...]
+
+Commands:
+  infra                 Start postgres/redis/qdrant via docker compose
+  backend               Start backend on host (uvicorn --reload)
+  frontend              Start frontend on host (pnpm dev)
+  up                    Start infra + backend(host) + frontend(host)
+  full                  Start full stack via docker compose
+  logs [service]        Tail docker compose logs (full compose by default)
+  doctor                Verify infra connectivity (postgres/redis/qdrant)
+  print-env             Print resolved key env values
+
+Environment files (loaded in order, later overrides earlier):
+  env/dev.shared
+  .env
+  env/dev.<profile>
+
+Profiles used by commands:
+  backend   -> env/dev.backend-host
+  frontend  -> env/dev.frontend-host
+  up        -> backend-host + frontend-host
+EOF
+}
+
+trim() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
+
+load_env_file() {
+  local file="$1"
+  [[ -f "$file" ]] || return 0
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="$(trim "$line")"
+    [[ -z "$line" ]] && continue
+    [[ "$line" == \#* ]] && continue
+
+    if [[ "$line" == export\ * ]]; then
+      line="${line#export }"
+      line="$(trim "$line")"
+    fi
+
+    [[ "$line" == *"="* ]] || continue
+    local key="${line%%=*}"
+    local val="${line#*=}"
+    key="$(trim "$key")"
+    val="$(trim "$val")"
+
+    if [[ "$val" == \"*\" && "$val" == *\" ]]; then
+      val="${val:1:${#val}-2}"
+    elif [[ "$val" == \'*\' && "$val" == *\' ]]; then
+      val="${val:1:${#val}-2}"
+    fi
+
+    if [[ -n "$key" ]]; then
+      export "${key}=${val}"
+    fi
+  done < "$file"
+}
+
+load_env_profiles() {
+  load_env_file "${ROOT_DIR}/env/dev.shared"
+  load_env_file "${ROOT_DIR}/.env"
+  for profile in "$@"; do
+    load_env_file "${ROOT_DIR}/env/dev.${profile}"
+  done
+}
+
+ensure_profile_file() {
+  local file="${ROOT_DIR}/env/dev.${1}"
+  local example="${file}.example"
+  if [[ ! -f "$file" && -f "$example" ]]; then
+    err "Missing ${file} (copy from ${example})"
+    err "  cp ${example} ${file}"
+    exit 1
+  fi
+}
+
+require_cmd() {
+  local cmd="$1"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    err "Missing required command: ${cmd}"
+    exit 1
+  fi
+}
+
+docker_infra() {
+  require_cmd docker
+  docker compose -f "$INFRA_COMPOSE_FILE" up -d
+}
+
+docker_full() {
+  require_cmd docker
+  docker compose -f "$FULL_COMPOSE_FILE" up --build
+}
+
+cmd_print_env() {
+  info "BACKEND_URL=${BACKEND_URL-}"
+  info "DATABASE_URL=${DATABASE_URL-}"
+  info "REDIS_URL=${REDIS_URL-}"
+  info "CELERY_BROKER_URL=${CELERY_BROKER_URL-}"
+  info "CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-}"
+  info "QDRANT_URL=${QDRANT_URL-}"
+  info "UPLOAD_DIR=${UPLOAD_DIR-}"
+  info "NEXTAUTH_URL=${NEXTAUTH_URL-}"
+}
+
+cmd_backend() {
+  ensure_profile_file backend-host
+  load_env_profiles backend-host
+  require_cmd uv
+  (
+    cd "${ROOT_DIR}/backend"
+    uv run alembic upgrade head
+    exec uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+  )
+}
+
+cmd_frontend() {
+  ensure_profile_file frontend-host
+  load_env_profiles frontend-host
+  require_cmd pnpm
+  (
+    cd "${ROOT_DIR}/frontend"
+    exec pnpm dev
+  )
+}
+
+cmd_logs() {
+  require_cmd docker
+  local service="${1-}"
+  if [[ -n "$service" ]]; then
+    docker compose -f "$FULL_COMPOSE_FILE" logs -f "$service"
+  else
+    docker compose -f "$FULL_COMPOSE_FILE" logs -f
+  fi
+}
+
+cmd_doctor() {
+  require_cmd docker
+  require_cmd curl
+
+  info "Checking docker infra containers..."
+  docker compose -f "$INFRA_COMPOSE_FILE" ps
+
+  info "Checking Postgres connectivity..."
+  docker compose -f "$INFRA_COMPOSE_FILE" exec -T postgres \
+    psql -U buildtest -d buildtest -c "SELECT 1;" >/dev/null
+  info "OK: Postgres"
+
+  info "Checking Redis connectivity..."
+  local redis_ping
+  redis_ping="$(docker compose -f "$INFRA_COMPOSE_FILE" exec -T redis redis-cli ping | tr -d '\r')"
+  if [[ "$redis_ping" != "PONG" ]]; then
+    err "Redis ping failed: ${redis_ping}"
+    exit 1
+  fi
+  info "OK: Redis"
+
+  info "Checking Qdrant connectivity..."
+  if curl -fsS "http://localhost:6333/healthz" >/dev/null; then
+    info "OK: Qdrant (/healthz)"
+  elif curl -fsS "http://localhost:6333/collections" >/dev/null; then
+    info "OK: Qdrant (/collections)"
+  else
+    err "Qdrant health check failed at localhost:6333"
+    exit 1
+  fi
+}
+
+cmd_up() {
+  ensure_profile_file backend-host
+  ensure_profile_file frontend-host
+  docker_infra
+
+  info "Starting backend(host) + frontend(host). Press Ctrl+C to stop."
+
+  load_env_profiles backend-host frontend-host
+  cmd_print_env
+
+  local backend_pid=""
+  local frontend_pid=""
+
+  cleanup() {
+    if [[ -n "${frontend_pid}" ]] && kill -0 "${frontend_pid}" >/dev/null 2>&1; then
+      kill "${frontend_pid}" >/dev/null 2>&1 || true
+    fi
+    if [[ -n "${backend_pid}" ]] && kill -0 "${backend_pid}" >/dev/null 2>&1; then
+      kill "${backend_pid}" >/dev/null 2>&1 || true
+    fi
+  }
+  trap cleanup EXIT INT TERM
+
+  (
+    cd "${ROOT_DIR}/backend"
+    uv run alembic upgrade head
+    exec uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+  ) &
+  backend_pid="$!"
+
+  (
+    cd "${ROOT_DIR}/frontend"
+    exec pnpm dev
+  ) &
+  frontend_pid="$!"
+
+  wait "${backend_pid}" "${frontend_pid}"
+}
+
+main() {
+  local cmd="${1-}"
+  shift || true
+
+  case "$cmd" in
+    infra)
+      docker_infra
+      ;;
+    backend)
+      cmd_backend
+      ;;
+    frontend)
+      cmd_frontend
+      ;;
+    up)
+      cmd_up
+      ;;
+    full)
+      docker_full
+      ;;
+    logs)
+      cmd_logs "$@"
+      ;;
+    doctor)
+      cmd_doctor
+      ;;
+    print-env)
+      load_env_profiles backend-host frontend-host
+      cmd_print_env
+      ;;
+    -h|--help|help|"")
+      usage
+      ;;
+    *)
+      err "Unknown command: ${cmd}"
+      usage
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"
+

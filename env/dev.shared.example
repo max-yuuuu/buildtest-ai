@@ -1,0 +1,13 @@
+# Non-secret shared defaults for development.
+#
+# Copy as needed:
+#   cp env/dev.shared.example env/dev.shared
+#
+# Keep secrets in root .env only.
+
+ENVIRONMENT=development
+LOG_LEVEL=INFO
+
+# When backend runs on host, prefer a writable local path:
+UPLOAD_DIR=./uploads
+

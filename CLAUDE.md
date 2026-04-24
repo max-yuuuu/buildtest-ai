@@ -58,7 +58,7 @@ collection 名按 user_id 派生,vector_db_configs 新增 namespace 字段。
 
 ## 开发命令
 
-全栈启动需先 `cp .env.example .env` 并填入 `GITHUB_ID/SECRET`、`GOOGLE_ID/SECRET`、`NEXTAUTH_SECRET`、`APP_ENCRYPTION_KEY`、`OPENAI_API_KEY`(详见 `KEYS.md`)。
+全栈启动需先 `cp .env.example .env` 并填入 `GITHUB_ID/SECRET`、`GOOGLE_ID/SECRET`、`NEXTAUTH_SECRET`、`APP_ENCRYPTION_KEY`(详见 `KEYS.md`)。Provider 密钥通过应用内 UI 配置并加密存储。
 
 ```bash
 # 全栈

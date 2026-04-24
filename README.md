@@ -14,7 +14,6 @@ RAG / Agent 应用的 **开发 + 评测 + 迭代** 一体化平台。
    - GitHub/Google OAuth
    - `NEXTAUTH_SECRET`:`openssl rand -base64 32`
    - `APP_ENCRYPTION_KEY`:`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
-   - OpenAI API Key(可选)
 
 2. **创建 `.env`**:
    ```bash
@@ -37,45 +36,73 @@ RAG / Agent 应用的 **开发 + 评测 + 迭代** 一体化平台。
 - **基础设施**：Postgres / Redis / Qdrant 用 Docker 跑
 - **应用层**：Next.js / FastAPI 用本机进程跑
 
+### 一次性准备（仅首次）
+
+0) 安装本机工具：
+
+- Docker（含 `docker compose`）
+- `uv`
+- `pnpm`
+
+1) 创建根目录 `.env`（密钥放这里）：
+
+```bash
+cp .env.example .env
+# 按 KEYS.md 填写必要密钥（OAuth / NEXTAUTH_SECRET / APP_ENCRYPTION_KEY 等）
+```
+
+`.env` 建议仅放密钥与通用配置；`DATABASE_URL` / `REDIS_URL` / `QDRANT_URL` / `BACKEND_URL` 等地址类变量统一放到 `env/dev.*`。
+
+2) 复制开发模式覆盖文件（不含密钥，仅 URL/端口/路径）：
+
+```bash
+cp env/dev.shared.example env/dev.shared
+cp env/dev.backend-host.example env/dev.backend-host
+cp env/dev.frontend-host.example env/dev.frontend-host
+```
+
+3) 安装依赖（仅首次或依赖变更后）：
+
+- 后端：`cd backend && uv pip install -r requirements.txt`
+- 前端：`cd frontend && pnpm install`
+
 ### 只启动基础设施（Docker）
 
 在仓库根目录：
 
 ```bash
-docker compose up -d postgres redis qdrant
+make infra
 ```
 
 ### 本机启动后端（FastAPI）
 
-后端默认从根目录 `.env` 读取配置（`backend/app/core/config.py`），当后端本机跑时，需要把连接地址指向 `localhost`。推荐用**命令行覆盖**，避免频繁修改 `.env`：
+后端默认从根目录 `.env` 读取密钥等配置，地址类变量通过 `env/dev.*` 覆盖实现无感切换：
 
 ```bash
-cd backend
-
-# 使用 uv 管理 Python/虚拟环境，并用 requirements.txt 安装依赖
-uv python install 3.12
-uv venv
-uv pip install -r requirements.txt
-
-DATABASE_URL="postgresql+asyncpg://buildtest:buildtest@localhost:5432/buildtest" \
-REDIS_URL="redis://localhost:6379/0" \
-CELERY_BROKER_URL="redis://localhost:6379/0" \
-CELERY_RESULT_BACKEND="redis://localhost:6379/1" \
-QDRANT_URL="http://localhost:6333" \
-UPLOAD_DIR="./uploads" \
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+make backend
 ```
 
 ### 本机启动前端（Next.js）
 
-前端通过 BFF 路由 `/api/backend/*` 代理到 Python 后端（见 `frontend/app/api/backend/[...path]/route.ts`），本机跑前端时把 `BACKEND_URL` 指到本机后端即可：
+前端通过 BFF 路由 `/api/backend/*` 代理到 Python 后端（见 `frontend/app/api/backend/[...path]/route.ts`）：
 
 ```bash
-cd frontend
-pnpm install
+make frontend
+```
 
-BACKEND_URL="http://localhost:8000" \
-pnpm dev
+### 默认推荐：一条命令拉起（infra + 后端本机 + 前端本机）
+
+```bash
+make up
+```
+
+> `make up` / `make backend` 会在启动后端前自动执行 `alembic upgrade head`，通常无需手动迁移。
+
+### 排错
+
+```bash
+make print-env
+make doctor
 ```
 
 > 更多“全 Docker / 前端本地 / 后端本地 / 全本地”的组合与切换策略，见 `build-test-ai.md` 的“本地开发模式与切换”章节。

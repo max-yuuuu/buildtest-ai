@@ -102,14 +102,34 @@ buildtest-ai/
 
 因此“切换模式”的核心不是改代码，而是**按启动位置选择不同的 env 值**。
 
-### 2.1.2 推荐做法：不改 `.env`，用命令行覆盖
+### 2.1.2 推荐做法：不改 `.env`，用统一入口无感切换
 
 后端配置由 `backend/app/core/config.py` 读取环境变量（默认读取根目录 `.env`），前端 BFF 代理由 `frontend/app/api/backend/[...path]/route.ts` 读取 `BACKEND_URL`。
 
-为避免在两种模式间来回手改 `.env`（且 `.env` 往往包含密钥），推荐用命令行覆盖关键变量：
+为避免在两种模式间来回手改 `.env`（且 `.env` 往往包含密钥），推荐把“密钥”和“地址类变量”分离：
 
-- 后端本机跑时覆盖：`DATABASE_URL/REDIS_URL/CELERY_*/QDRANT_URL/UPLOAD_DIR`
-- 前端本机跑时覆盖：`BACKEND_URL`
+- 根目录 `.env`：只放密钥与少量共享默认值（不提交 git）
+- `env/dev.*`：只放**非敏感**的地址类覆盖（提交 `.example`，本地复制生成）
+- 用 `make`（内部调用 `scripts/dev`）统一加载与覆盖，从而实现模式切换“无感”
+
+一次性准备（仅首次）：
+
+```bash
+cp env/dev.shared.example env/dev.shared
+cp env/dev.backend-host.example env/dev.backend-host
+cp env/dev.frontend-host.example env/dev.frontend-host
+```
+
+常用命令：
+
+```bash
+make infra       # docker 起 postgres/redis/qdrant
+make backend     # 本机起后端（自动连 localhost infra）
+make frontend    # 本机起前端（自动指向 localhost:8000）
+make up          # infra + backend(host) + frontend(host)
+make doctor      # Postgres/Redis/Qdrant 真实连通性检查
+make print-env   # 查看当前解析出的关键 env
+```
 
 ### 2.1.3 新增：仅基础设施 compose 文件
 

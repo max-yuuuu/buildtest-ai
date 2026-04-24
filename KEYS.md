@@ -35,12 +35,11 @@
 
 ## 2. LLM / Embedding Provider
 
-用户可在平台内动态添加,但开发环境至少需要一家。
+Provider 凭证通过平台 UI 动态添加并加密存储,不再从根目录 `.env` 读取 `OPENAI_API_KEY` / `OPENAI_BASE_URL`。
 
-### 2.1 OpenAI **[推荐必需]**
+### 2.1 OpenAI **[按需]**
 - 申请地址:https://platform.openai.com/api-keys
-- 获得:`OPENAI_API_KEY`(仅用于开发期的种子数据和 CI 回归,生产环境通过平台 UI 管理)
-- 可选:`OPENAI_BASE_URL`(走代理时填)
+- 使用方式:在 Provider 管理页新增 OpenAI 类型并填写 API Key（可选 Base URL）
 
 ### 2.2 Anthropic **[稍后]**
 - https://console.anthropic.com/settings/keys
@@ -121,7 +120,6 @@
 
 在 GitHub 仓库 Settings → Secrets and variables → Actions 配置:
 
-- `OPENAI_API_KEY`(用于 E2E 评测回归测试,不使用可留空配合 VCR 回放)
 - `DOCKER_HUB_TOKEN` **[稍后]**
 - `DEPLOY_SSH_KEY` **[稍后]**
 
@@ -135,8 +133,6 @@
 | 2 | `GOOGLE_ID` / `GOOGLE_SECRET` | Google Cloud OAuth |
 | 3 | `NEXTAUTH_SECRET` | `openssl rand -base64 32` |
 | 4 | `APP_ENCRYPTION_KEY` | `python -c "..."`(见 §5) |
-| 5 | `OPENAI_API_KEY` | OpenAI Platform(CI 可用 VCR 回放替代) |
-
-其余(Postgres / Redis / Qdrant)docker-compose 自动处理,无需人工。
+其余(Postgres / Redis / Qdrant)docker-compose 自动处理,无需人工。Provider 密钥在应用内配置,无需预置到根 `.env`。
 
 准备好后将值填入仓库根目录的 `.env` 文件(见 `.env.example`)。

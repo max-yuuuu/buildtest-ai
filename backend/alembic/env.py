@@ -1,16 +1,16 @@
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from app.core.database import Base
-from app.core.config import settings
 import app.models  # noqa: F401 — 注册所有模型
+from alembic import context
+from app.core.config import settings
+from app.core.database import Base
 
 config = context.config
 config.set_main_option(
     "sqlalchemy.url",
-    settings.database_url.replace("postgresql+asyncpg", "postgresql+psycopg2"),
+    settings.database_url.replace("postgresql+asyncpg", "postgresql+psycopg"),
 )
 
 if config.config_file_name is not None:

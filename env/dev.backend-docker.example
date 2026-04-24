@@ -1,0 +1,7 @@
+# Backend runs in docker; infra should be reachable via compose service names.
+DATABASE_URL=postgresql+asyncpg://buildtest:buildtest@postgres:5432/buildtest
+REDIS_URL=redis://redis:6379/0
+CELERY_BROKER_URL=redis://redis:6379/0
+CELERY_RESULT_BACKEND=redis://redis:6379/1
+QDRANT_URL=http://qdrant:6333
+

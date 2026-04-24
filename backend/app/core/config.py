@@ -17,9 +17,6 @@ class Settings(BaseSettings):
 
     app_encryption_key: str = ""
 
-    openai_api_key: str | None = None
-    openai_base_url: str | None = None
-
     upload_max_size_mb: int = 50
     upload_dir: str = "/app/uploads"
 

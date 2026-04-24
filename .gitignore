@@ -3,6 +3,13 @@
 .env.local
 .env.*.local
 
+# Local dev profile overrides (non-secret but machine-specific)
+env/dev.shared
+env/dev.backend-host
+env/dev.backend-docker
+env/dev.frontend-host
+env/dev.frontend-docker
+
 # Python
 __pycache__/
 *.py[cod]

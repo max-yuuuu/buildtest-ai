@@ -1,0 +1,3 @@
+# Frontend runs in docker; backend should be reachable via compose service name.
+BACKEND_URL=http://backend:8000
+

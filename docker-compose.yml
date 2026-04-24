@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   # 使用带 pgvector 的镜像，便于向量库「测试连接」与后续知识库
   postgres:
