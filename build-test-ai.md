@@ -126,7 +126,7 @@ cp env/dev.frontend-host.example env/dev.frontend-host
 make infra       # docker 起 postgres/redis/qdrant
 make backend     # 本机起后端（自动连 localhost infra）
 make frontend    # 本机起前端（自动指向 localhost:8000）
-make up          # infra + backend(host) + frontend(host)
+make up          # infra + backend(host) + worker(host) + frontend(host)
 make doctor      # Postgres/Redis/Qdrant 真实连通性检查
 make print-env   # 查看当前解析出的关键 env
 ```
@@ -253,7 +253,7 @@ worker 建议与后端同一侧启动（都本地或都 docker），否则也需
 
 ### 2.3.2 上传目录 `UPLOAD_DIR` 要怎么配？
 
-默认值 `/app/uploads` 是容器内路径。本机启动后端时建议设置为仓库内相对路径（如 `UPLOAD_DIR="./uploads"` 或 `UPLOAD_DIR="../uploads"`），以保证写入路径存在且可读写。
+默认值 `/app/uploads` 是容器内路径。本机启动时建议通过 `env/dev.shared` 统一配置（默认 `UPLOAD_DIR=./uploads`），并由启动脚本自动解析为仓库根绝对路径，确保 backend 与 worker 读写同一目录，避免“原文文件不存在”。
 
 ## 3. 数据库表结构设计
 

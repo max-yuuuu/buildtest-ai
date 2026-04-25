@@ -31,10 +31,10 @@ RAG / Agent 应用的 **开发 + 评测 + 迭代** 一体化平台。
 
 ## 本地开发模式（推荐）
 
-本项目支持“**基础设施用 Docker，前后端本地启动**”的混合模式，便于调试且不强依赖容器环境。
+本项目支持“**基础设施用 Docker，前后端 + worker 本地启动**”的混合模式，便于调试且不强依赖容器环境。
 
 - **基础设施**：Postgres / Redis / Qdrant 用 Docker 跑
-- **应用层**：Next.js / FastAPI 用本机进程跑
+- **应用层**：Next.js / FastAPI / Celery Worker 用本机进程跑
 
 ### 一次性准备（仅首次）
 
@@ -52,6 +52,7 @@ cp .env.example .env
 ```
 
 `.env` 建议仅放密钥与通用配置；`DATABASE_URL` / `REDIS_URL` / `QDRANT_URL` / `BACKEND_URL` 等地址类变量统一放到 `env/dev.*`。
+`UPLOAD_DIR` 建议保持默认（`env/dev.shared` 中配置），由启动脚本统一解析为仓库根目录下的绝对路径，避免 backend 与 worker 因工作目录不同产生 `backend/uploads` 与 `uploads` 混用。
 
 2) 复制开发模式覆盖文件（不含密钥，仅 URL/端口/路径）：
 
@@ -82,6 +83,12 @@ make infra
 make backend
 ```
 
+### 本机启动 Celery Worker
+
+```bash
+make worker
+```
+
 ### 本机启动前端（Next.js）
 
 前端通过 BFF 路由 `/api/backend/*` 代理到 Python 后端（见 `frontend/app/api/backend/[...path]/route.ts`）：
@@ -90,7 +97,7 @@ make backend
 make frontend
 ```
 
-### 默认推荐：一条命令拉起（infra + 后端本机 + 前端本机）
+### 默认推荐：一条命令拉起（infra + 后端本机 + worker 本机 + 前端本机）
 
 ```bash
 make up
@@ -104,6 +111,8 @@ make up
 make print-env
 make doctor
 ```
+
+若出现“文档入库失败：原文文件不存在”，优先检查是否同时运行了多套 worker（如 docker worker + 本地 worker），并确认 `make print-env` 输出的 `UPLOAD_DIR` 为同一绝对路径。
 
 > 更多“全 Docker / 前端本地 / 后端本地 / 全本地”的组合与切换策略，见 `build-test-ai.md` 的“本地开发模式与切换”章节。
 

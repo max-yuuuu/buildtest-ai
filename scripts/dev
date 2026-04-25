@@ -16,8 +16,9 @@ Usage:
 Commands:
   infra                 Start postgres/redis/qdrant via docker compose
   backend               Start backend on host (uvicorn --reload)
+  worker                Start celery worker on host
   frontend              Start frontend on host (pnpm dev)
-  up                    Start infra + backend(host) + frontend(host)
+  up                    Start infra + backend(host) + worker(host) + frontend(host)
   full                  Start full stack via docker compose
   logs [service]        Tail docker compose logs (full compose by default)
   doctor                Verify infra connectivity (postgres/redis/qdrant)
@@ -30,6 +31,7 @@ Environment files (loaded in order, later overrides earlier):
 
 Profiles used by commands:
   backend   -> env/dev.backend-host
+  worker    -> env/dev.backend-host
   frontend  -> env/dev.frontend-host
   up        -> backend-host + frontend-host
 EOF
@@ -80,6 +82,16 @@ load_env_profiles() {
   for profile in "$@"; do
     load_env_file "${ROOT_DIR}/env/dev.${profile}"
   done
+  normalize_path_env
+}
+
+normalize_path_env() {
+  # Keep backend and celery worker aligned even when launched from different cwd.
+  # Relative UPLOAD_DIR is always resolved from repository root.
+  if [[ -n "${UPLOAD_DIR-}" && "${UPLOAD_DIR}" != /* ]]; then
+    UPLOAD_DIR="${ROOT_DIR}/${UPLOAD_DIR#./}"
+    export UPLOAD_DIR
+  fi
 }
 
 ensure_profile_file() {
@@ -129,6 +141,16 @@ cmd_backend() {
     cd "${ROOT_DIR}/backend"
     uv run alembic upgrade head
     exec uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+  )
+}
+
+cmd_worker() {
+  ensure_profile_file backend-host
+  load_env_profiles backend-host
+  require_cmd uv
+  (
+    cd "${ROOT_DIR}/backend"
+    exec uv run celery -A app.core.celery_app worker -l info
   )
 }
 
@@ -189,12 +211,13 @@ cmd_up() {
   ensure_profile_file frontend-host
   docker_infra
 
-  info "Starting backend(host) + frontend(host). Press Ctrl+C to stop."
+  info "Starting backend(host) + worker(host) + frontend(host). Press Ctrl+C to stop."
 
   load_env_profiles backend-host frontend-host
   cmd_print_env
 
   local backend_pid=""
+  local worker_pid=""
   local frontend_pid=""
 
   cleanup() {
@@ -203,6 +226,9 @@ cmd_up() {
     fi
     if [[ -n "${backend_pid}" ]] && kill -0 "${backend_pid}" >/dev/null 2>&1; then
       kill "${backend_pid}" >/dev/null 2>&1 || true
+    fi
+    if [[ -n "${worker_pid}" ]] && kill -0 "${worker_pid}" >/dev/null 2>&1; then
+      kill "${worker_pid}" >/dev/null 2>&1 || true
     fi
   }
   trap cleanup EXIT INT TERM
@@ -213,6 +239,12 @@ cmd_up() {
     exec uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
   ) &
   backend_pid="$!"
+
+  (
+    cd "${ROOT_DIR}/backend"
+    exec uv run celery -A app.core.celery_app worker -l info
+  ) &
+  worker_pid="$!"
 
   (
     cd "${ROOT_DIR}/frontend"
@@ -233,6 +265,9 @@ main() {
       ;;
     backend)
       cmd_backend
+      ;;
+    worker)
+      cmd_worker
       ;;
     frontend)
       cmd_frontend
