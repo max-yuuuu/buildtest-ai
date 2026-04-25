@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import socket
 import time
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
@@ -18,6 +20,36 @@ def _normalize_postgres_dsn(dsn: str) -> str:
     return s
 
 
+_DOCKER_SERVICE_HOSTS = {"postgres", "redis", "qdrant", "backend"}
+
+
+def _with_localhost_host(dsn: str) -> str:
+    parts = urlsplit(dsn)
+    host = parts.hostname or ""
+    if host not in _DOCKER_SERVICE_HOSTS:
+        return dsn
+    if "@" not in parts.netloc:
+        return dsn
+
+    userinfo, hostport = parts.netloc.rsplit("@", 1)
+    if hostport.startswith("["):
+        return dsn
+
+    if ":" in hostport:
+        _, port = hostport.split(":", 1)
+        netloc = f"{userinfo}@localhost:{port}"
+    else:
+        netloc = f"{userinfo}@localhost"
+    return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+
+
+def _is_host_resolution_error(exc: Exception) -> bool:
+    if isinstance(exc, socket.gaierror):
+        return True
+    msg = str(exc).lower()
+    return "nodename nor servname provided" in msg or "name or service not known" in msg
+
+
 async def probe_postgres(connection_string: str) -> VectorDbTestResult:
     started = time.perf_counter()
     try:
@@ -30,11 +62,21 @@ async def probe_postgres(connection_string: str) -> VectorDbTestResult:
         )
 
     dsn = _normalize_postgres_dsn(connection_string)
+    tried_fallback = False
     try:
         conn = await asyncpg.connect(dsn, timeout=8.0)
     except Exception as e:
-        elapsed = int((time.perf_counter() - started) * 1000)
-        return VectorDbTestResult(ok=False, latency_ms=elapsed, message=str(e))
+        fallback_dsn = _with_localhost_host(dsn)
+        if fallback_dsn != dsn and _is_host_resolution_error(e):
+            tried_fallback = True
+            try:
+                conn = await asyncpg.connect(fallback_dsn, timeout=8.0)
+            except Exception as e2:
+                elapsed = int((time.perf_counter() - started) * 1000)
+                return VectorDbTestResult(ok=False, latency_ms=elapsed, message=str(e2))
+        else:
+            elapsed = int((time.perf_counter() - started) * 1000)
+            return VectorDbTestResult(ok=False, latency_ms=elapsed, message=str(e))
     try:
         await conn.fetchval("SELECT 1")
         has_vec = await conn.fetchval(
@@ -46,6 +88,12 @@ async def probe_postgres(connection_string: str) -> VectorDbTestResult:
                 ok=False,
                 latency_ms=elapsed,
                 message="已连接 PostgreSQL，但未安装 pgvector 扩展（CREATE EXTENSION vector）",
+            )
+        if tried_fallback:
+            return VectorDbTestResult(
+                ok=True,
+                latency_ms=elapsed,
+                message="ok（已自动回退 host=localhost，请更新连接地址）",
             )
         return VectorDbTestResult(ok=True, latency_ms=elapsed, message="ok")
     finally:
