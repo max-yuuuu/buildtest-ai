@@ -12,6 +12,7 @@ import {
   CircleDashed,
   FileText,
   Loader2,
+  RotateCcw,
   Search,
   Settings2,
   Sparkles,
@@ -38,7 +39,7 @@ import { knowledgeBaseApi } from "@/lib/api";
 import type { KbDocument } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type DocStatus = "pending" | "processing" | "completed" | "failed";
+type DocStatus = "pending" | "queued" | "processing" | "completed" | "failed";
 
 export default function KnowledgeBaseDetailPage() {
   const params = useParams();
@@ -46,6 +47,7 @@ export default function KnowledgeBaseDetailPage() {
   const qc = useQueryClient();
   const formInit = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const failedToastSentRef = useRef<Set<string>>(new Set());
 
   const { data: kb, isLoading } = useQuery({
     queryKey: ["knowledge-bases", id],
@@ -54,6 +56,15 @@ export default function KnowledgeBaseDetailPage() {
   const { data: docs } = useQuery({
     queryKey: ["knowledge-bases", id, "documents"],
     queryFn: () => knowledgeBaseApi.listDocuments(id),
+    refetchInterval: (query) => {
+      const items = query.state.data as KbDocument[] | undefined;
+      if (!items || items.length === 0) return false;
+      const hasRunning = items.some((d) =>
+        ["pending", "queued", "processing"].includes(d.status),
+      );
+      return hasRunning ? 2000 : false;
+    },
+    refetchIntervalInBackground: true,
   });
 
   const [name, setName] = useState("");
@@ -64,6 +75,7 @@ export default function KnowledgeBaseDetailPage() {
   const [threshold, setThreshold] = useState("");
   const [query, setQuery] = useState("");
   const [deletingDoc, setDeletingDoc] = useState<KbDocument | null>(null);
+  const [retryingDocId, setRetryingDocId] = useState<string | null>(null);
   const [hits, setHits] = useState<
     { document_id: string; chunk_index: number; text: string; score: number }[]
   >([]);
@@ -82,6 +94,17 @@ export default function KnowledgeBaseDetailPage() {
     setTopK(String(kb.retrieval_top_k));
     setThreshold(String(kb.retrieval_similarity_threshold));
   }, [kb]);
+
+  useEffect(() => {
+    if (!docs) return;
+    for (const d of docs) {
+      const toastKey = `${d.id}:${d.updated_at}`;
+      if (d.status === "failed" && d.error_message && !failedToastSentRef.current.has(toastKey)) {
+        failedToastSentRef.current.add(toastKey);
+        toast.error(`文档「${d.file_name}」入库失败：${d.error_message}`);
+      }
+    }
+  }, [docs]);
 
   const updateMutation = useMutation({
     mutationFn: () =>
@@ -107,7 +130,7 @@ export default function KnowledgeBaseDetailPage() {
       qc.invalidateQueries({ queryKey: ["knowledge-bases", id, "documents"] });
       qc.invalidateQueries({ queryKey: ["knowledge-bases", id] });
       qc.invalidateQueries({ queryKey: ["knowledge-bases"] });
-      toast.success("上传完成");
+      toast.success("上传成功，文档已进入入库队列");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -130,6 +153,20 @@ export default function KnowledgeBaseDetailPage() {
       setDeletingDoc(null);
     },
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  const retryDocMutation = useMutation({
+    mutationFn: async (docId: string) => {
+      setRetryingDocId(docId);
+      return knowledgeBaseApi.retryDocumentIngestion(id, docId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["knowledge-bases", id, "documents"] });
+      qc.invalidateQueries({ queryKey: ["knowledge-bases", id] });
+      toast.success("已重新加入入库队列");
+    },
+    onError: (e: Error) => toast.error(e.message),
+    onSettled: () => setRetryingDocId(null),
   });
 
   if (isLoading || !kb) {
@@ -244,6 +281,7 @@ export default function KnowledgeBaseDetailPage() {
               <Input
                 value={threshold}
                 onChange={(e) => setThreshold(e.target.value)}
+                placeholder="0.0 - 1.0（建议先从 0.4 开始）"
               />
             </div>
           </div>
@@ -324,7 +362,7 @@ export default function KnowledgeBaseDetailPage() {
                       <StatusBadge status={d.status as DocStatus} />
                       {d.error_message && (
                         <p
-                          className="mt-1 max-w-xs truncate text-xs text-destructive/90"
+                          className="mt-1 max-w-xs whitespace-pre-wrap break-words text-xs text-destructive/90"
                           title={d.error_message}
                         >
                           {d.error_message}
@@ -338,15 +376,33 @@ export default function KnowledgeBaseDetailPage() {
                       {formatSize(d.file_size)}
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeletingDoc(d)}
-                        className="h-7 text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="mr-1 h-3.5 w-3.5" />
-                        删除
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        {d.status === "failed" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => retryDocMutation.mutate(d.id)}
+                            disabled={retryDocMutation.isPending}
+                            className="h-7"
+                          >
+                            {retryingDocId === d.id ? (
+                              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                            )}
+                            重试
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeletingDoc(d)}
+                          className="h-7 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="mr-1 h-3.5 w-3.5" />
+                          删除
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -491,6 +547,11 @@ function StatusBadge({ status }: { status: DocStatus }) {
   > = {
     pending: {
       label: "等待",
+      className: "bg-muted text-muted-foreground",
+      icon: <CircleDashed className="h-3 w-3" />,
+    },
+    queued: {
+      label: "排队中",
       className: "bg-muted text-muted-foreground",
       icon: <CircleDashed className="h-3 w-3" />,
     },

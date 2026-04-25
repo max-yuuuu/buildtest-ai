@@ -19,12 +19,6 @@ class ModelBase(BaseModel):
 
 class ModelCreate(ModelBase):
     @model_validator(mode="after")
-    def _embedding_requires_dim(self) -> "ModelCreate":
-        if self.model_type == "embedding" and self.vector_dimension is None:
-            raise ValueError("vector_dimension is required for embedding models")
-        return self
-
-    @model_validator(mode="after")
     def _batch_size_only_for_embedding(self) -> "ModelCreate":
         if self.model_type != "embedding" and self.embedding_batch_size is not None:
             raise ValueError("embedding_batch_size is only valid for embedding models")
@@ -56,3 +50,12 @@ class AvailableModel(BaseModel):
     model_id: str
     suggested_type: ModelType | None = None
     is_registered: bool = False
+
+
+class EmbeddingDimensionProbeRequest(BaseModel):
+    model_id: str = Field(min_length=1, max_length=100)
+
+
+class EmbeddingDimensionProbeResponse(BaseModel):
+    model_id: str
+    vector_dimension: int

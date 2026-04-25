@@ -127,6 +127,7 @@ export default function KnowledgeBasesPage() {
         name: name.trim(),
         vector_db_config_id: vectorDbId,
         embedding_model_id: embeddingModelId,
+        retrieval_similarity_threshold: 0.4,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["knowledge-bases"] });

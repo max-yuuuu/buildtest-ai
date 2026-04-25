@@ -11,10 +11,12 @@ from app.models.provider import Provider
 from app.repositories.model import ModelRepository
 from app.repositories.provider import ProviderRepository
 from app.schemas.model import AvailableModel, ModelCreate, ModelRead, ModelUpdate
-from app.services import provider_probe
+from app.services import embedding_client, provider_probe
 
 
 class ModelService:
+    EMBEDDING_BATCH_SIZE_DEFAULT = 10
+
     def __init__(self, session: AsyncSession, user_id: uuid.UUID) -> None:
         self.session = session
         self.user_id = user_id
@@ -54,18 +56,27 @@ class ModelService:
         return self._to_read(m)
 
     async def create(self, provider_id: uuid.UUID, data: ModelCreate) -> ModelRead:
-        await self._ensure_provider(provider_id)
+        provider = await self._ensure_provider(provider_id)
         existing = await self.repo.get_by_model_id(provider_id, data.model_id)
         if existing is not None:
             raise HTTPException(status_code=409, detail="model already registered")
+        vector_dimension = data.vector_dimension
+        if data.model_type == "embedding":
+            vector_dimension = await self.probe_embedding_dimension(
+                provider_id, data.model_id, provider
+            )
         m = Model(
             provider_id=provider_id,
             model_id=data.model_id,
             model_type=data.model_type,
             context_window=data.context_window,
-            vector_dimension=data.vector_dimension,
-            embedding_batch_size=data.embedding_batch_size,
+            vector_dimension=vector_dimension,
+            embedding_batch_size=(
+                data.embedding_batch_size if data.model_type == "embedding" else None
+            ),
         )
+        if m.model_type == "embedding" and m.embedding_batch_size is None:
+            m.embedding_batch_size = self.EMBEDDING_BATCH_SIZE_DEFAULT
         try:
             await self.repo.create(m)
             await self.session.commit()
@@ -78,7 +89,7 @@ class ModelService:
     async def update(
         self, provider_id: uuid.UUID, model_pk: uuid.UUID, data: ModelUpdate
     ) -> ModelRead:
-        await self._ensure_provider(provider_id)
+        provider = await self._ensure_provider(provider_id)
         m = await self.repo.get(model_pk)
         if m is None or m.provider_id != provider_id:
             raise HTTPException(status_code=404, detail="model not found")
@@ -90,12 +101,12 @@ class ModelService:
             m.vector_dimension = data.vector_dimension
         if data.embedding_batch_size is not None:
             m.embedding_batch_size = data.embedding_batch_size
-        # embedding 仍需保证 vector_dimension:改为 embedding 时若无维度则拒绝
-        if m.model_type == "embedding" and m.vector_dimension is None:
-            await self.session.rollback()
-            raise HTTPException(
-                status_code=422, detail="vector_dimension is required for embedding models"
+        if m.model_type == "embedding":
+            m.vector_dimension = await self.probe_embedding_dimension(
+                provider_id, m.model_id, provider
             )
+            if m.embedding_batch_size is None:
+                m.embedding_batch_size = self.EMBEDDING_BATCH_SIZE_DEFAULT
         # batch_size 仅 embedding 模型有意义;改为非 embedding 时顺带清空,避免字段语义漂移
         if m.model_type != "embedding" and m.embedding_batch_size is not None:
             m.embedding_batch_size = None
@@ -165,6 +176,32 @@ class ModelService:
             )
             for mid in upstream
         ]
+
+    async def probe_embedding_dimension(
+        self,
+        provider_id: uuid.UUID,
+        model_id: str,
+        provider: Provider | None = None,
+    ) -> int:
+        p = provider or await self._ensure_provider(provider_id)
+        if not p.is_active:
+            raise HTTPException(status_code=409, detail="provider 未启用，无法探测 embedding 维度")
+        try:
+            vectors = await embedding_client.embed_texts(
+                provider_type=p.provider_type,
+                api_key=p.api_key_encrypted,
+                base_url=p.base_url,
+                model_id=model_id,
+                texts=["dimension_probe"],
+            )
+        except embedding_client.EmbeddingError as e:
+            raise HTTPException(status_code=502, detail=f"探测 embedding 维度失败: {e}") from e
+        if not vectors or not vectors[0]:
+            raise HTTPException(
+                status_code=502,
+                detail="探测 embedding 维度失败: 上游未返回有效向量",
+            )
+        return len(vectors[0])
 
 
 def _infer_model_type(model_id: str) -> str:

@@ -53,6 +53,11 @@ export interface AvailableModel {
   is_registered: boolean;
 }
 
+export interface EmbeddingDimensionProbeResult {
+  model_id: string;
+  vector_dimension: number;
+}
+
 export interface ModelCreateInput {
   model_id: string;
   model_type: ModelType;

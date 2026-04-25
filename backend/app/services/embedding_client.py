@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
+import re
+
 DEFAULT_BATCH_SIZE = 64
 
 
 class EmbeddingError(Exception):
     pass
+
+
+def _extract_batch_limit(message: str) -> int | None:
+    matched = re.search(r"should not be larger than\s+(\d+)", message, flags=re.IGNORECASE)
+    if matched:
+        return int(matched.group(1))
+    return None
 
 
 async def embed_texts(
@@ -30,12 +39,28 @@ async def embed_texts(
     effective_url = base_url or "https://api.openai.com/v1"
     out: list[list[float]] = []
     batch = batch_size if batch_size and batch_size > 0 else DEFAULT_BATCH_SIZE
+    idx = 0
     try:
-        for i in range(0, len(texts), batch):
-            chunk = texts[i : i + batch]
-            resp = await client.embeddings.create(model=model_id, input=chunk)
+        while idx < len(texts):
+            chunk = texts[idx : idx + batch]
+            try:
+                resp = await client.embeddings.create(model=model_id, input=chunk)
+            except APIStatusError as e:
+                body = getattr(e, "message", None) or str(e)
+                limit = _extract_batch_limit(body)
+                is_batch_error = (
+                    e.status_code == 400
+                    and limit is not None
+                    and "batch size" in body.lower()
+                    and batch > limit > 0
+                )
+                if is_batch_error:
+                    batch = limit
+                    continue
+                raise
             for item in resp.data:
                 out.append(list(item.embedding))
+            idx += len(chunk)
     except APIConnectionError as e:
         cause = getattr(e, "__cause__", None) or e
         raise EmbeddingError(
@@ -44,8 +69,10 @@ async def embed_texts(
         ) from e
     except APIStatusError as e:
         body = getattr(e, "message", None) or str(e)
+        limit = _extract_batch_limit(body)
+        suggestion = f"；建议将 embedding_batch_size 设置为 {limit}" if limit is not None else ""
         raise EmbeddingError(
-            f"embedding 接口返回错误 HTTP {e.status_code}: {body} "
+            f"embedding 接口返回错误 HTTP {e.status_code}: {body}{suggestion} "
             f"(base_url={effective_url}, model={model_id})"
         ) from e
     if len(out) != len(texts):

@@ -20,6 +20,7 @@ from app.repositories.provider import ProviderRepository
 from app.repositories.vector_db_config import VectorDbConfigRepository
 from app.schemas.knowledge_base import (
     DocumentRead,
+    IngestionJobRead,
     KnowledgeBaseCreate,
     KnowledgeBaseRead,
     KnowledgeBaseUpdate,
@@ -30,6 +31,7 @@ from app.schemas.knowledge_base import (
 )
 from app.services import embedding_client
 from app.services.document_loaders import extract_text
+from app.services.ingestion_job_service import IngestionJobService
 from app.services.vector_connector import VectorChunkItem, vector_connector_for_config
 
 
@@ -52,6 +54,7 @@ class KnowledgeBaseService:
         self.vdb_repo = VectorDbConfigRepository(session, user_id)
         self.model_repo = ModelRepository(session, user_id)
         self.provider_repo = ProviderRepository(session, user_id)
+        self.ingestion_job_service = IngestionJobService(session, user_id)
 
     async def _get_vdbc(self, config_id: uuid.UUID) -> VectorDbConfig:
         row = await self.vdb_repo.get(config_id)
@@ -92,9 +95,16 @@ class KnowledgeBaseService:
             updated_at=kb.updated_at,
         )
 
-    @staticmethod
-    def _to_doc_read(d: Document) -> DocumentRead:
-        return DocumentRead.model_validate(d)
+    async def _to_doc_read(self, d: Document) -> DocumentRead:
+        latest_job = await self.ingestion_job_service.repo.get_latest_for_document(
+            d.knowledge_base_id, d.id
+        )
+        data = DocumentRead.model_validate(d).model_dump()
+        if latest_job is not None:
+            data["ingestion_job_id"] = latest_job.id
+            data["ingestion_job_status"] = latest_job.status
+            data["ingestion_attempt_count"] = latest_job.attempt_count
+        return DocumentRead.model_validate(data)
 
     async def list(self) -> list[KnowledgeBaseRead]:
         items = await self.kb_repo.list()
@@ -198,7 +208,10 @@ class KnowledgeBaseService:
     async def list_documents(self, kb_id: uuid.UUID) -> list[DocumentRead]:
         await self._require_kb(kb_id)
         docs = await self.doc_repo.list_for_kb(kb_id)
-        return [self._to_doc_read(d) for d in docs]
+        out: list[DocumentRead] = []
+        for d in docs:
+            out.append(await self._to_doc_read(d))
+        return out
 
     async def _require_kb(self, kb_id: uuid.UUID) -> KnowledgeBase:
         kb = await self.kb_repo.get(kb_id)
@@ -225,7 +238,7 @@ class KnowledgeBaseService:
             file_name=safe_name,
             file_type=ext or None,
             file_size=len(data),
-            status="pending",
+            status="queued",
         )
         await self.doc_repo.create(doc)
         await self.session.flush()
@@ -235,11 +248,97 @@ class KnowledgeBaseService:
         dest.write_bytes(data)
         rel = str(dest.relative_to(Path(settings.upload_dir)))
         doc.storage_path = rel
+        job = await self.ingestion_job_service.create_job(kb.id, doc.id)
         await self.session.commit()
         await self.session.refresh(doc)
+        from app.tasks.ingestion import process_document_ingestion_task
+
+        process_document_ingestion_task.delay(
+            str(self.user_id),
+            str(kb.id),
+            str(doc.id),
+            str(job.id),
+        )
+        return await self._to_doc_read(doc)
+
+    async def get_latest_ingestion_job(
+        self, kb_id: uuid.UUID, doc_id: uuid.UUID
+    ) -> IngestionJobRead:
+        await self._require_kb(kb_id)
+        doc = await self.doc_repo.get(kb_id, doc_id)
+        if doc is None:
+            raise HTTPException(status_code=404, detail="document not found")
+        job = await self.ingestion_job_service.repo.get_latest_for_document(kb_id, doc_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="ingestion job not found")
+        return IngestionJobRead.model_validate(job)
+
+    async def retry_latest_ingestion_job(
+        self, kb_id: uuid.UUID, doc_id: uuid.UUID
+    ) -> IngestionJobRead:
+        kb = await self._require_kb(kb_id)
+        doc = await self.doc_repo.get(kb_id, doc_id)
+        if doc is None:
+            raise HTTPException(status_code=404, detail="document not found")
+        latest = await self.ingestion_job_service.repo.get_latest_for_document(kb_id, doc_id)
+        if latest is None:
+            raise HTTPException(status_code=404, detail="ingestion job not found")
+        if latest.status not in ("failed", "queued"):
+            raise HTTPException(status_code=409, detail="当前状态不可手动重试")
+
+        if latest.status == "failed":
+            latest = await self.ingestion_job_service.retry_job(latest.id)
+        await self.session.commit()
+
+        from app.tasks.ingestion import process_document_ingestion_task
+
+        process_document_ingestion_task.delay(
+            str(self.user_id),
+            str(kb.id),
+            str(doc.id),
+            str(latest.id),
+        )
+        refreshed = await self.ingestion_job_service.repo.get(latest.id)
+        if refreshed is None:
+            raise HTTPException(status_code=404, detail="ingestion job not found")
+        return IngestionJobRead.model_validate(refreshed)
+
+    async def process_document_ingestion(
+        self,
+        kb_id: uuid.UUID,
+        doc_id: uuid.UUID,
+        job_id: uuid.UUID,
+    ) -> None:
+        kb = await self._require_kb(kb_id)
+        doc = await self.doc_repo.get(kb_id, doc_id)
+        if doc is None:
+            raise HTTPException(status_code=404, detail="document not found")
+        await self.ingestion_job_service.start_processing(job_id)
+        doc.status = "processing"
+        doc.error_message = None
+        await self.session.commit()
+        if not doc.storage_path:
+            await self.ingestion_job_service.fail_job(job_id, "缺少 storage_path，无法入库")
+            doc.status = "failed"
+            doc.error_message = "缺少 storage_path，无法入库"
+            await self.session.commit()
+            return
+        path = Path(settings.upload_dir) / doc.storage_path
+        if not path.is_file():
+            await self.ingestion_job_service.fail_job(job_id, "原文文件不存在")
+            doc.status = "failed"
+            doc.error_message = "原文文件不存在"
+            await self.session.commit()
+            return
+        data = path.read_bytes()
         await self._ingest_document(kb, doc, data)
         await self.session.refresh(doc)
-        return self._to_doc_read(doc)
+        if doc.status == "completed":
+            await self.ingestion_job_service.complete_job(job_id)
+            await self.session.commit()
+            return
+        await self.ingestion_job_service.fail_job(job_id, doc.error_message or "文档入库失败")
+        await self.session.commit()
 
     async def _ingest_document(self, kb: KnowledgeBase, doc: Document, file_bytes: bytes) -> None:
         if kb.embedding_model_id is None:
@@ -288,10 +387,20 @@ class KnowledgeBaseService:
                 texts=chunks,
                 batch_size=m.embedding_batch_size,
             )
+            effective_base_url = p.base_url or "https://api.openai.com/v1"
             for vec in vectors:
                 if len(vec) != kb.embedding_dimension:
                     raise embedding_client.EmbeddingError(
-                        f"向量维度 {len(vec)} 与知识库锁定维度 {kb.embedding_dimension} 不一致"
+                        "向量维度不一致: "
+                        f"provider 返回 {len(vec)} 维, "
+                        f"知识库锁定 {kb.embedding_dimension} 维。"(
+                            f"(provider={p.provider_type}, "
+                            f"model={m.model_id}, "
+                            f"base_url={effective_base_url})。"
+                        )(
+                            "请核对该 embedding 模型在平台登记的 "
+                            "vector_dimension 是否与上游实际输出一致。"
+                        )
                     )
             coll = kb.collection_name if vdbc.db_type == "qdrant" else str(kb.id)
             await conn.ensure_collection(coll, kb.embedding_dimension)

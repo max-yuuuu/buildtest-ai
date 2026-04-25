@@ -1,4 +1,5 @@
 from app.models.document import Document
+from app.models.ingestion_job import IngestionJob
 from app.models.kb_vector_chunk import KbVectorChunk
 from app.models.knowledge_base import KnowledgeBase
 from app.models.model import Model
@@ -13,5 +14,6 @@ __all__ = [
     "VectorDbConfig",
     "KnowledgeBase",
     "Document",
+    "IngestionJob",
     "KbVectorChunk",
 ]

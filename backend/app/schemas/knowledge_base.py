@@ -13,7 +13,7 @@ class KnowledgeBaseCreate(BaseModel):
     chunk_size: int = Field(default=512, ge=64, le=8192)
     chunk_overlap: int = Field(default=50, ge=0, le=4096)
     retrieval_top_k: int = Field(default=5, ge=1, le=50)
-    retrieval_similarity_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
+    retrieval_similarity_threshold: float = Field(default=0.4, ge=0.0, le=1.0)
     retrieval_config: dict = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -66,6 +66,27 @@ class DocumentRead(BaseModel):
     status: str
     chunk_count: int
     error_message: str | None
+    created_at: datetime
+    updated_at: datetime
+    ingestion_job_id: uuid.UUID | None = None
+    ingestion_job_status: str | None = None
+    ingestion_attempt_count: int | None = None
+
+
+class IngestionJobRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    knowledge_base_id: uuid.UUID
+    document_id: uuid.UUID
+    status: str
+    attempt_count: int
+    max_retries: int
+    error_message: str | None
+    queued_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
     created_at: datetime
     updated_at: datetime
 

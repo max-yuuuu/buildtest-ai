@@ -91,7 +91,8 @@ function defaultValuesFromProps(
     model_type: (candidate?.suggested_type ?? "llm") as ModelType,
     context_window: "",
     vector_dimension: "",
-    embedding_batch_size: "",
+    embedding_batch_size:
+      candidate?.suggested_type === "embedding" ? "10" : "",
   };
 }
 
@@ -124,6 +125,34 @@ export function RegisterModelDialog({
   }, [candidate, editing, form]);
 
   const modelType = form.watch("model_type");
+  const modelId = form.watch("model_id");
+
+  const probeMutation = useMutation({
+    mutationFn: async (currentModelId: string) =>
+      modelApi.probeEmbeddingDimension(providerId, currentModelId),
+    onSuccess: (res) => {
+      form.setValue("vector_dimension", String(res.vector_dimension), {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+      toast.success(`已探测到维度: ${res.vector_dimension}`);
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  useEffect(() => {
+    if (modelType !== "embedding") return;
+    if (!modelId?.trim()) return;
+    if (!form.getValues("embedding_batch_size")) {
+      form.setValue("embedding_batch_size", "10", {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+    if (form.getValues("vector_dimension")) return;
+    probeMutation.mutate(modelId.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelType, modelId]);
 
   const mutation = useMutation({
     mutationFn: async (values: FormParsed) => {
@@ -179,7 +208,7 @@ export function RegisterModelDialog({
             ) : (
               "把上游模型登记到本地,知识库 / 评测任务才能绑定。"
             )}{" "}
-            embedding 模型必须提供向量维度;单次向量化条数可填{" "}
+            embedding 模型会自动探测向量维度并复用;单次向量化条数可填{" "}
             <span className="font-mono">embedding_batch_size</span>
             (可选,1–2048,留空用默认)。
           </DialogDescription>
@@ -251,9 +280,23 @@ export function RegisterModelDialog({
                   id="vector_dimension"
                   type="number"
                   min={1}
-                  placeholder="如 1536 / 3072"
+                  readOnly
+                  placeholder={
+                    probeMutation.isPending ? "探测中..." : "自动探测后填充"
+                  }
                   {...form.register("vector_dimension")}
                 />
+                <div className="mt-1 flex justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={!modelId?.trim() || probeMutation.isPending}
+                    onClick={() => probeMutation.mutate(modelId.trim())}
+                  >
+                    {probeMutation.isPending ? "探测中..." : "测试并刷新维度"}
+                  </Button>
+                </div>
                 {form.formState.errors.vector_dimension && (
                   <p className="text-xs text-destructive">
                     {form.formState.errors.vector_dimension.message as string}

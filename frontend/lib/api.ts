@@ -6,6 +6,7 @@ import type {
   KbDocument,
   Model,
   ModelCreateInput,
+  EmbeddingDimensionProbeResult,
   ModelUpdateInput,
   Provider,
   ProviderCreateInput,
@@ -79,6 +80,11 @@ export const modelApi = {
     request<void>(`/providers/${providerId}/models/${modelPk}`, {
       method: "DELETE",
     }),
+  probeEmbeddingDimension: (providerId: string, modelId: string) =>
+    request<EmbeddingDimensionProbeResult>(`/providers/${providerId}/models/dimension-probe`, {
+      method: "POST",
+      body: JSON.stringify({ model_id: modelId }),
+    }),
 };
 
 export const vectorDbApi = {
@@ -149,5 +155,9 @@ export const knowledgeBaseApi = {
   deleteDocument: (kbId: string, docId: string) =>
     request<void>(`/knowledge-bases/${kbId}/documents/${docId}`, {
       method: "DELETE",
+    }),
+  retryDocumentIngestion: (kbId: string, docId: string) =>
+    request<void>(`/knowledge-bases/${kbId}/documents/${docId}/ingestion-job/retry`, {
+      method: "POST",
     }),
 };

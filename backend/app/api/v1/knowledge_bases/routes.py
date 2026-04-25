@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.deps import get_current_user_id, get_session
 from app.schemas.knowledge_base import (
     DocumentRead,
+    IngestionJobRead,
     KnowledgeBaseCreate,
     KnowledgeBaseRead,
     KnowledgeBaseUpdate,
@@ -94,6 +95,29 @@ async def delete_document(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     await _svc(session, user_id).delete_document(kb_id, doc_id)
+
+
+@router.get("/{kb_id}/documents/{doc_id}/ingestion-job", response_model=IngestionJobRead)
+async def get_latest_ingestion_job(
+    kb_id: uuid.UUID,
+    doc_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> IngestionJobRead:
+    return await _svc(session, user_id).get_latest_ingestion_job(kb_id, doc_id)
+
+
+@router.post(
+    "/{kb_id}/documents/{doc_id}/ingestion-job/retry",
+    response_model=IngestionJobRead,
+)
+async def retry_latest_ingestion_job(
+    kb_id: uuid.UUID,
+    doc_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> IngestionJobRead:
+    return await _svc(session, user_id).retry_latest_ingestion_job(kb_id, doc_id)
 
 
 @router.post("/{kb_id}/retrieve", response_model=RetrieveResponse)
