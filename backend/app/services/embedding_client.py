@@ -5,6 +5,13 @@ from __future__ import annotations
 import re
 
 DEFAULT_BATCH_SIZE = 64
+_OPENAI_COMPAT_ENDPOINT_SUFFIXES = (
+    "/embeddings",
+    "/chat/completions",
+    "/completions",
+    "/responses",
+    "/models",
+)
 
 
 class EmbeddingError(Exception):
@@ -16,6 +23,19 @@ def _extract_batch_limit(message: str) -> int | None:
     if matched:
         return int(matched.group(1))
     return None
+
+
+def _normalize_openai_compatible_base_url(base_url: str | None) -> str:
+    """Normalize user-provided endpoint URL to an OpenAI-compatible API root."""
+    if not base_url:
+        return "https://api.openai.com/v1"
+    normalized = base_url.strip().rstrip("/")
+    lower = normalized.lower()
+    for suffix in _OPENAI_COMPAT_ENDPOINT_SUFFIXES:
+        if lower.endswith(suffix):
+            normalized = normalized[: -len(suffix)]
+            break
+    return normalized.rstrip("/")
 
 
 async def embed_texts(
@@ -36,7 +56,7 @@ async def embed_texts(
     if not api_key:
         raise EmbeddingError("provider 未配置 api_key")
 
-    effective_url = base_url or "https://api.openai.com/v1"
+    effective_url = _normalize_openai_compatible_base_url(base_url)
     out: list[list[float]] = []
     batch = batch_size if batch_size and batch_size > 0 else DEFAULT_BATCH_SIZE
     idx = 0
@@ -46,7 +66,7 @@ async def embed_texts(
     try:
         async with AsyncOpenAI(
             api_key=api_key,
-            base_url=base_url or None,
+            base_url=effective_url,
             timeout=60.0,
             http_client=http_client,
         ) as client:
