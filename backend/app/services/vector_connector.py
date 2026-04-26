@@ -1,4 +1,4 @@
-"""向量库统一抽象：postgres_pgvector（JSON 存 embedding + 内存相似度）与 Qdrant。"""
+"""向量库统一抽象：postgres_pgvector（原生 SQL 检索）与 Qdrant。"""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.kb_vector_chunk import KbVectorChunk
@@ -27,10 +27,12 @@ class VectorChunkItem:
 
 @dataclass
 class SearchHit:
+    knowledge_base_id: uuid.UUID
     document_id: uuid.UUID
     chunk_index: int
     text: str
     score: float
+    source: dict | None = None
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -86,6 +88,34 @@ class PostgresPgVectorConnector:
 
     async def upsert_chunks(self, collection: str, items: list[VectorChunkItem]) -> None:
         _ = collection
+        if not items:
+            return
+        expected_dim = len(items[0].embedding)
+        for item in items:
+            if len(item.embedding) != expected_dim:
+                raise ValueError(
+                    "向量维度不一致: 入库批次中存在不同长度的 embedding，"
+                    f"期望 {expected_dim}，实际 {len(item.embedding)}。"
+                )
+        dialect_name = self.session.bind.dialect.name if self.session.bind is not None else ""
+        if dialect_name == "postgresql":
+            dim_result = await self.session.execute(
+                text(
+                    """
+                    SELECT vector_dims(embedding)
+                    FROM kb_vector_chunks
+                    WHERE knowledge_base_id = :kb_id
+                    LIMIT 1
+                    """
+                ),
+                {"kb_id": items[0].knowledge_base_id},
+            )
+            stored_dim = dim_result.scalar_one_or_none()
+            if stored_dim is not None and int(stored_dim) != expected_dim:
+                raise ValueError(
+                    "向量维度不一致: 待写入向量维度与知识库现有分块维度不匹配，"
+                    f"写入为 {expected_dim}，已存储为 {int(stored_dim)}。"
+                )
         for it in items:
             row = KbVectorChunk(
                 knowledge_base_id=it.knowledge_base_id,
@@ -126,25 +156,92 @@ class PostgresPgVectorConnector:
         score_threshold: float | None,
     ) -> list[SearchHit]:
         _ = collection
-        result = await self.session.execute(
-            select(KbVectorChunk).where(KbVectorChunk.knowledge_base_id == knowledge_base_id)
-        )
-        rows = list(result.scalars().all())
-        scored: list[SearchHit] = []
-        for row in rows:
-            sim = cosine_similarity(query_vector, row.embedding)
-            if score_threshold is not None and sim < score_threshold:
-                continue
-            scored.append(
-                SearchHit(
-                    document_id=row.document_id,
-                    chunk_index=row.chunk_index,
-                    text=row.text,
-                    score=sim,
-                )
+        if not query_vector:
+            return []
+
+        dialect_name = self.session.bind.dialect.name if self.session.bind is not None else ""
+        if dialect_name != "postgresql":
+            result = await self.session.execute(
+                select(KbVectorChunk).where(KbVectorChunk.knowledge_base_id == knowledge_base_id)
             )
-        scored.sort(key=lambda h: h.score, reverse=True)
-        return scored[:top_k]
+            rows = list(result.scalars().all())
+            scored: list[SearchHit] = []
+            for row in rows:
+                sim = cosine_similarity(query_vector, row.embedding)
+                if score_threshold is not None and sim < score_threshold:
+                    continue
+                scored.append(
+                    SearchHit(
+                        knowledge_base_id=row.knowledge_base_id,
+                        document_id=row.document_id,
+                        chunk_index=row.chunk_index,
+                        text=row.text,
+                        score=sim,
+                        source=row.source_metadata or {},
+                    )
+                )
+            scored.sort(key=lambda h: h.score, reverse=True)
+            return scored[:top_k]
+
+        dim_result = await self.session.execute(
+            text(
+                """
+                SELECT vector_dims(embedding)
+                FROM kb_vector_chunks
+                WHERE knowledge_base_id = :kb_id
+                LIMIT 1
+                """
+            ),
+            {"kb_id": knowledge_base_id},
+        )
+        stored_dim = dim_result.scalar_one_or_none()
+        if stored_dim is not None and int(stored_dim) != len(query_vector):
+            raise ValueError(
+                "向量维度不一致: 查询向量维度与已存储分块维度不匹配，"
+                f"查询为 {len(query_vector)}，已存储为 {int(stored_dim)}。"
+            )
+
+        query_vec_literal = "[" + ",".join(str(float(item)) for item in query_vector) + "]"
+        result = await self.session.execute(
+            text(
+                """
+                SELECT
+                    knowledge_base_id,
+                    document_id,
+                    chunk_index,
+                    text,
+                    source_metadata,
+                    1 - (embedding <=> CAST(:query_vec AS vector)) AS score
+                FROM kb_vector_chunks
+                WHERE knowledge_base_id = :kb_id
+                  AND (
+                    CAST(:score_threshold AS double precision) IS NULL
+                    OR 1 - (embedding <=> CAST(:query_vec AS vector))
+                        >= CAST(:score_threshold AS double precision)
+                  )
+                ORDER BY embedding <=> CAST(:query_vec AS vector)
+                LIMIT :top_k
+                """
+            ),
+            {
+                "kb_id": knowledge_base_id,
+                "query_vec": query_vec_literal,
+                "score_threshold": score_threshold,
+                "top_k": top_k,
+            },
+        )
+        rows = result.mappings().all()
+        return [
+            SearchHit(
+                knowledge_base_id=row["knowledge_base_id"],
+                document_id=row["document_id"],
+                chunk_index=row["chunk_index"],
+                text=row["text"],
+                score=float(row["score"]),
+                source=row["source_metadata"] or {},
+            )
+            for row in rows
+        ]
 
 
 class QdrantConnector:
@@ -202,6 +299,7 @@ class QdrantConnector:
                         "chunk_index": it.chunk_index,
                         "text": it.text,
                         "content_hash": it.content_hash,
+                        "source": it.source_metadata or {},
                     },
                 )
             )
@@ -280,10 +378,12 @@ class QdrantConnector:
                 continue
             hits.append(
                 SearchHit(
+                    knowledge_base_id=knowledge_base_id,
                     document_id=uuid.UUID(str(did)),
                     chunk_index=int(pl.get("chunk_index", 0)),
                     text=str(pl.get("text", "")),
                     score=float(p.score),
+                    source=pl.get("source"),
                 )
             )
         return hits
