@@ -172,3 +172,105 @@ async def test_kb_not_found(client, user_headers):
     rid = str(uuid.uuid4())
     r = await client.get(f"/api/v1/knowledge-bases/{rid}", headers=user_headers)
     assert r.status_code == 404
+
+
+async def test_document_chunks_endpoint_contract(
+    client, user_headers, fake_embed, monkeypatch, session
+):
+    import pathlib
+    from types import SimpleNamespace
+
+    from sqlalchemy import select
+
+    from app.models.document import Document
+    from app.models.kb_vector_chunk import KbVectorChunk
+
+    root = "/tmp/buildtest-uploads-test-chunks"
+    pathlib.Path(root).mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(
+        "app.services.knowledge_base_service.settings",
+        SimpleNamespace(upload_dir=root, upload_max_size_mb=50),
+    )
+    monkeypatch.setattr(
+        "app.tasks.ingestion.process_document_ingestion_task.delay",
+        lambda *args, **kwargs: None,
+    )
+
+    pid = await _provider_id(client, user_headers)
+    mid = await _embedding_model_id(client, user_headers, pid)
+    vid = await _vector_db_id(client, user_headers)
+
+    kb_res = await client.post(
+        "/api/v1/knowledge-bases",
+        json={
+            "name": "chunk-inspect",
+            "vector_db_config_id": vid,
+            "embedding_model_id": mid,
+        },
+        headers=user_headers,
+    )
+    assert kb_res.status_code == 201
+    kb_id = kb_res.json()["id"]
+
+    upload_res = await client.post(
+        f"/api/v1/knowledge-bases/{kb_id}/documents",
+        headers=user_headers,
+        files={"file": ("note.txt", io.BytesIO(b"hello chunk view"), "text/plain")},
+    )
+    assert upload_res.status_code == 201
+    doc_id = upload_res.json()["id"]
+
+    # non-completed document should return 409 document_not_ready
+    not_ready = await client.get(
+        f"/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}/chunks",
+        headers=user_headers,
+    )
+    assert not_ready.status_code == 409
+    assert not_ready.json()["detail"]["code"] == "document_not_ready"
+
+    # patch document/chunks as completed then verify page/section/token fields
+    doc_uuid = uuid.UUID(doc_id)
+    doc_row = (await session.execute(select(Document).where(Document.id == doc_uuid))).scalar_one()
+    doc_row.status = "completed"
+    session.add(
+        KbVectorChunk(
+            knowledge_base_id=uuid.UUID(kb_id),
+            document_id=doc_uuid,
+            chunk_index=0,
+            content_hash="h" * 64,
+            text="1. 项目概述\n这是第一段",
+            embedding=[0.1, 0.2, 0.3, 0.4],
+            token_length=8,
+            source_metadata={"page": 1, "section": "1. 项目概述"},
+        )
+    )
+    await session.commit()
+
+    ready = await client.get(
+        f"/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}/chunks",
+        headers=user_headers,
+    )
+    assert ready.status_code == 200
+    body = ready.json()
+    assert body["items"][0]["token_length"] == 8
+    assert body["items"][0]["source"]["page"] == 1
+    assert body["items"][0]["source"]["section"] == "1. 项目概述"
+
+    # invalid pagination should return 422
+    bad_page = await client.get(
+        f"/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}/chunks?page=0",
+        headers=user_headers,
+    )
+    assert bad_page.status_code == 422
+
+    # cross-tenant access should return 404
+    another_user_headers = {
+        "X-User-Id": f"github:{uuid.uuid4()}",
+        "X-User-Email": "other@example.com",
+        "X-User-Name": "Other User",
+    }
+    forbidden = await client.get(
+        f"/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}/chunks",
+        headers=another_user_headers,
+    )
+    assert forbidden.status_code == 404

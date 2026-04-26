@@ -14,6 +14,7 @@ import type {
   ProviderUpdateInput,
   RetrieveInput,
   RetrieveResponse,
+  DocumentChunksResponse,
   VectorDbConfig,
   VectorDbCreateInput,
   VectorDbTestResult,
@@ -34,7 +35,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     let detail = `HTTP ${res.status}`;
     try {
       const body = await res.json();
-      detail = body.detail ?? body.error ?? detail;
+      if (typeof body.detail === "string") {
+        detail = body.detail;
+      } else if (body.detail?.message) {
+        detail = body.detail.message;
+      } else {
+        detail = body.error ?? detail;
+      }
     } catch {}
     throw new Error(detail);
   }
@@ -160,4 +167,8 @@ export const knowledgeBaseApi = {
     request<void>(`/knowledge-bases/${kbId}/documents/${docId}/ingestion-job/retry`, {
       method: "POST",
     }),
+  getDocumentChunks: (kbId: string, docId: string, page = 1, pageSize = 10) =>
+    request<DocumentChunksResponse>(
+      `/knowledge-bases/${kbId}/documents/${docId}/chunks?page=${page}&page_size=${pageSize}`,
+    ),
 };

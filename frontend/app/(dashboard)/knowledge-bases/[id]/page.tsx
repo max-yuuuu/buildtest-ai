@@ -36,7 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { knowledgeBaseApi } from "@/lib/api";
-import type { KbDocument } from "@/lib/types";
+import type { KbDocument, RetrieveResponse } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type DocStatus = "pending" | "queued" | "processing" | "completed" | "failed";
@@ -76,9 +76,7 @@ export default function KnowledgeBaseDetailPage() {
   const [query, setQuery] = useState("");
   const [deletingDoc, setDeletingDoc] = useState<KbDocument | null>(null);
   const [retryingDocId, setRetryingDocId] = useState<string | null>(null);
-  const [hits, setHits] = useState<
-    { document_id: string; chunk_index: number; text: string; score: number }[]
-  >([]);
+  const [retrieveResult, setRetrieveResult] = useState<RetrieveResponse | null>(null);
 
   useEffect(() => {
     formInit.current = false;
@@ -138,7 +136,7 @@ export default function KnowledgeBaseDetailPage() {
   const retrieveMutation = useMutation({
     mutationFn: () => knowledgeBaseApi.retrieve(id, { query: query.trim() }),
     onSuccess: (res) => {
-      setHits(res.hits);
+      setRetrieveResult(res);
       toast.success(`命中 ${res.hits.length} 条`);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -393,6 +391,27 @@ export default function KnowledgeBaseDetailPage() {
                             重试
                           </Button>
                         )}
+                        {d.status === "completed" ? (
+                          <Button asChild variant="ghost" size="sm" className="h-7">
+                            <Link
+                              href={
+                                `/knowledge-bases/${id}/documents/${d.id}/chunks` as Route
+                              }
+                            >
+                              查看分块
+                            </Link>
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled
+                            className="h-7"
+                            title="文档处理中，暂不可查看"
+                          >
+                            查看分块
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -418,7 +437,7 @@ export default function KnowledgeBaseDetailPage() {
           icon={<Sparkles className="h-4 w-4 text-muted-foreground" />}
           title="试检索"
           hint="验证切块与 embedding 效果,命中结果含 chunk 原文与分数"
-          count={hits.length > 0 ? hits.length : undefined}
+          count={retrieveResult?.hits.length ? retrieveResult.hits.length : undefined}
         />
         <div className="rounded-xl border bg-card p-5">
           <textarea
@@ -452,9 +471,15 @@ export default function KnowledgeBaseDetailPage() {
             </Button>
           </div>
         </div>
-        {hits.length > 0 && (
+        {retrieveResult && retrieveResult.hits.length > 0 && (
           <div className="space-y-2">
-            {hits.map((h, i) => (
+            {(retrieveResult.strategy_id || retrieveResult.retrieval_params) && (
+              <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+                策略: {retrieveResult.strategy_id ?? "-"} · 参数快照:{" "}
+                {JSON.stringify(retrieveResult.retrieval_params ?? {})}
+              </div>
+            )}
+            {retrieveResult.hits.map((h, i) => (
               <div
                 key={`${h.document_id}-${h.chunk_index}-${i}`}
                 className="rounded-lg border bg-card p-4 text-sm"

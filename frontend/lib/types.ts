@@ -165,6 +165,9 @@ export interface KbDocument {
   error_message: string | null;
   created_at: string;
   updated_at: string;
+  ingestion_job_id?: string | null;
+  ingestion_job_status?: string | null;
+  ingestion_attempt_count?: number | null;
 }
 
 export interface RetrieveInput {
@@ -178,8 +181,46 @@ export interface RetrieveHit {
   chunk_index: number;
   text: string;
   score: number;
+  knowledge_base_id?: string;
+  source?: Record<string, unknown> | null;
 }
 
 export interface RetrieveResponse {
   hits: RetrieveHit[];
+  strategy_id?: string;
+  retrieval_params?: Record<string, unknown>;
+}
+
+export interface DocumentChunkItem {
+  id: string;
+  chunk_index: number;
+  char_length: number;
+  token_length: number | null;
+  preview_text: string | null;
+  source: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface DocumentChunksResponse {
+  document: {
+    id: string;
+    knowledge_base_id: string;
+    name: string;
+    status: string;
+    ingestion_job_id: string | null;
+    completed_at: string | null;
+  };
+  chunk_summary: {
+    total_chunks: number;
+    avg_char_length: number | null;
+    min_char_length: number | null;
+    max_char_length: number | null;
+  };
+  pagination: {
+    page: number;
+    page_size: number;
+    total: number;
+    total_pages: number;
+  };
+  items: DocumentChunkItem[];
 }
