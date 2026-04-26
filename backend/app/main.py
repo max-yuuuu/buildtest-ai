@@ -5,10 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.database import engine
+from app.core.schema_guard import check_chunk_metadata_columns
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    app.state.chunk_metadata_schema_ready = await check_chunk_metadata_columns(engine)
     yield
 
 

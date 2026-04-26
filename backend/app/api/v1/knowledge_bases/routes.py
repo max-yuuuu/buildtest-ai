@@ -1,10 +1,11 @@
 import uuid
 
-from fastapi import APIRouter, Body, Depends, File, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user_id, get_session
 from app.schemas.knowledge_base import (
+    DocumentChunksResponse,
     DocumentRead,
     IngestionJobRead,
     KnowledgeBaseCreate,
@@ -105,6 +106,25 @@ async def get_latest_ingestion_job(
     session: AsyncSession = Depends(get_session),
 ) -> IngestionJobRead:
     return await _svc(session, user_id).get_latest_ingestion_job(kb_id, doc_id)
+
+
+@router.get("/{kb_id}/documents/{doc_id}/chunks", response_model=DocumentChunksResponse)
+async def get_document_chunks(
+    kb_id: uuid.UUID,
+    doc_id: uuid.UUID,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    include_text: bool = Query(default=True),
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentChunksResponse:
+    return await _svc(session, user_id).get_document_chunks(
+        kb_id,
+        doc_id,
+        page=page,
+        page_size=page_size,
+        include_text=include_text,
+    )
 
 
 @router.post(

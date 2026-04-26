@@ -24,5 +24,7 @@ class KbVectorChunk(Base):
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     embedding: Mapped[list[float]] = mapped_column(JSON, nullable=False)
+    token_length: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

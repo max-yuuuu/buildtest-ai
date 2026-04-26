@@ -3,13 +3,17 @@ from __future__ import annotations
 import hashlib
 import os
 import uuid
+from math import ceil
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
+from sqlalchemy import func, select
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.document import Document
+from app.models.kb_vector_chunk import KbVectorChunk
 from app.models.knowledge_base import KnowledgeBase
 from app.models.model import Model
 from app.models.vector_db_config import VectorDbConfig
@@ -19,6 +23,11 @@ from app.repositories.model import ModelRepository
 from app.repositories.provider import ProviderRepository
 from app.repositories.vector_db_config import VectorDbConfigRepository
 from app.schemas.knowledge_base import (
+    DocumentChunkDocumentRead,
+    DocumentChunkPaginationRead,
+    DocumentChunkRead,
+    DocumentChunksResponse,
+    DocumentChunkSummaryRead,
     DocumentRead,
     IngestionJobRead,
     KnowledgeBaseCreate,
@@ -30,7 +39,7 @@ from app.schemas.knowledge_base import (
     RetrieveResponse,
 )
 from app.services import embedding_client
-from app.services.document_loaders import extract_text
+from app.services.document_loaders import extract_segments, infer_section_title
 from app.services.ingestion_job_service import IngestionJobService
 from app.services.vector_connector import VectorChunkItem, vector_connector_for_config
 
@@ -43,6 +52,13 @@ def _collection_key(kb: KnowledgeBase, db_type: str) -> str:
 
 def _make_collection_name(kb_id: uuid.UUID, dim: int) -> str:
     return f"kb_{kb_id.hex}_{dim}"
+
+
+def _estimate_token_length(text: str) -> int:
+    words = text.split()
+    if len(words) >= max(1, len(text) // 8):
+        return len(words)
+    return max(1, ceil(len(text) / 2))
 
 
 class KnowledgeBaseService:
@@ -303,6 +319,108 @@ class KnowledgeBaseService:
             raise HTTPException(status_code=404, detail="ingestion job not found")
         return IngestionJobRead.model_validate(refreshed)
 
+    async def get_document_chunks(
+        self,
+        kb_id: uuid.UUID,
+        doc_id: uuid.UUID,
+        *,
+        page: int = 1,
+        page_size: int = 10,
+        include_text: bool = True,
+    ) -> DocumentChunksResponse:
+        await self._require_kb(kb_id)
+        doc = await self.doc_repo.get(kb_id, doc_id)
+        if doc is None:
+            raise HTTPException(status_code=404, detail="document not found")
+        if doc.status != "completed":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "document_not_ready",
+                    "message": "Document is not ready for chunk inspection",
+                    "detail": {"document_id": str(doc.id), "status": doc.status},
+                },
+            )
+
+        stats_result = await self.session.execute(
+            select(
+                func.count(KbVectorChunk.id),
+                func.avg(func.length(KbVectorChunk.text)),
+                func.min(func.length(KbVectorChunk.text)),
+                func.max(func.length(KbVectorChunk.text)),
+            ).where(
+                KbVectorChunk.knowledge_base_id == kb_id,
+                KbVectorChunk.document_id == doc_id,
+            )
+        )
+        total_chunks, avg_char_length, min_char_length, max_char_length = stats_result.one()
+        total = int(total_chunks or 0)
+        total_pages = max(1, ceil(total / page_size)) if total > 0 else 1
+        offset = (page - 1) * page_size
+
+        rows = []
+        try:
+            if total > 0:
+                rows_result = await self.session.execute(
+                    select(KbVectorChunk)
+                    .where(
+                        KbVectorChunk.knowledge_base_id == kb_id,
+                        KbVectorChunk.document_id == doc_id,
+                    )
+                    .order_by(KbVectorChunk.chunk_index.asc())
+                    .offset(offset)
+                    .limit(page_size)
+                )
+                rows = list(rows_result.scalars().all())
+        except ProgrammingError as exc:
+            msg = str(exc).lower()
+            if "token_length" in msg or "source_metadata" in msg:
+                raise HTTPException(
+                    status_code=503,
+                    detail=(
+                        "数据库结构未升级到最新版本，请先执行 `alembic upgrade head` "
+                        "后再访问分块详情。"
+                    ),
+                ) from exc
+            raise
+
+        items = [
+            DocumentChunkRead(
+                id=row.id,
+                chunk_index=row.chunk_index,
+                char_length=len(row.text),
+                token_length=row.token_length,
+                preview_text=row.text[:400] if include_text else None,
+                source=row.source_metadata or {},
+                created_at=row.created_at,
+            )
+            for row in rows
+        ]
+        latest_job = await self.ingestion_job_service.repo.get_latest_for_document(kb_id, doc_id)
+        return DocumentChunksResponse(
+            document=DocumentChunkDocumentRead(
+                id=doc.id,
+                knowledge_base_id=doc.knowledge_base_id,
+                name=doc.file_name,
+                status=doc.status,
+                ingestion_job_id=latest_job.id if latest_job is not None else None,
+                completed_at=doc.updated_at if doc.status == "completed" else None,
+            ),
+            chunk_summary=DocumentChunkSummaryRead(
+                total_chunks=total,
+                avg_char_length=float(avg_char_length) if avg_char_length is not None else None,
+                min_char_length=int(min_char_length) if min_char_length is not None else None,
+                max_char_length=int(max_char_length) if max_char_length is not None else None,
+            ),
+            pagination=DocumentChunkPaginationRead(
+                page=page,
+                page_size=page_size,
+                total=total,
+                total_pages=total_pages,
+            ),
+            items=items,
+        )
+
     async def process_document_ingestion(
         self,
         kb_id: uuid.UUID,
@@ -359,8 +477,8 @@ class KnowledgeBaseService:
         try:
             from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-            text = extract_text(file_name=doc.file_name or "x.txt", data=file_bytes)
-            if not text.strip():
+            segments = extract_segments(file_name=doc.file_name or "x.txt", data=file_bytes)
+            if not segments:
                 doc.status = "failed"
                 doc.chunk_count = 0
                 doc.error_message = "未抽取到文本内容，请确认文件不是扫描件或已损坏"
@@ -371,7 +489,19 @@ class KnowledgeBaseService:
                 chunk_size=kb.chunk_size,
                 chunk_overlap=kb.chunk_overlap,
             )
-            chunks = splitter.split_text(text)
+            chunks_with_source: list[tuple[str, dict]] = []
+            for seg in segments:
+                for chunk in splitter.split_text(seg.text):
+                    chunks_with_source.append(
+                        (
+                            chunk,
+                            {
+                                "page": seg.page,
+                                "section": infer_section_title(chunk),
+                            },
+                        )
+                    )
+            chunks = [chunk for chunk, _ in chunks_with_source]
             if not chunks:
                 doc.status = "failed"
                 doc.chunk_count = 0
@@ -393,20 +523,20 @@ class KnowledgeBaseService:
                     raise embedding_client.EmbeddingError(
                         "向量维度不一致: "
                         f"provider 返回 {len(vec)} 维, "
-                        f"知识库锁定 {kb.embedding_dimension} 维。"(
-                            f"(provider={p.provider_type}, "
-                            f"model={m.model_id}, "
-                            f"base_url={effective_base_url})。"
-                        )(
-                            "请核对该 embedding 模型在平台登记的 "
-                            "vector_dimension 是否与上游实际输出一致。"
-                        )
+                        f"知识库锁定 {kb.embedding_dimension} 维。"
+                        f"(provider={p.provider_type}, "
+                        f"model={m.model_id}, "
+                        f"base_url={effective_base_url})。"
+                        "请核对该 embedding 模型在平台登记的 "
+                        "vector_dimension 是否与上游实际输出一致。"
                     )
             coll = kb.collection_name if vdbc.db_type == "qdrant" else str(kb.id)
             await conn.ensure_collection(coll, kb.embedding_dimension)
 
             items: list[VectorChunkItem] = []
-            for i, (chunk, vec) in enumerate(zip(chunks, vectors, strict=True)):
+            for i, ((chunk, source_meta), vec) in enumerate(
+                zip(chunks_with_source, vectors, strict=True)
+            ):
                 h = hashlib.sha256(chunk.encode("utf-8")).hexdigest()
                 items.append(
                     VectorChunkItem(
@@ -416,6 +546,8 @@ class KnowledgeBaseService:
                         text=chunk,
                         embedding=vec,
                         content_hash=h,
+                        token_length=_estimate_token_length(chunk),
+                        source_metadata=source_meta,
                     )
                 )
             await conn.delete_by_document(key, doc.id)

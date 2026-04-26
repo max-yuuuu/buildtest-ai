@@ -73,6 +73,46 @@ class DocumentRead(BaseModel):
     ingestion_attempt_count: int | None = None
 
 
+class DocumentChunkRead(BaseModel):
+    id: uuid.UUID
+    chunk_index: int
+    char_length: int
+    token_length: int | None = None
+    preview_text: str | None = None
+    source: dict = Field(default_factory=dict)
+    created_at: datetime
+
+
+class DocumentChunkSummaryRead(BaseModel):
+    total_chunks: int
+    avg_char_length: float | None = None
+    min_char_length: int | None = None
+    max_char_length: int | None = None
+
+
+class DocumentChunkPaginationRead(BaseModel):
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+
+
+class DocumentChunkDocumentRead(BaseModel):
+    id: uuid.UUID
+    knowledge_base_id: uuid.UUID
+    name: str
+    status: str
+    ingestion_job_id: uuid.UUID | None = None
+    completed_at: datetime | None = None
+
+
+class DocumentChunksResponse(BaseModel):
+    document: DocumentChunkDocumentRead
+    chunk_summary: DocumentChunkSummaryRead
+    pagination: DocumentChunkPaginationRead
+    items: list[DocumentChunkRead]
+
+
 class IngestionJobRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
