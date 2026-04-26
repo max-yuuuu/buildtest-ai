@@ -449,8 +449,8 @@ export function Header() {
         >
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
-            <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-fuchsia-500 px-1 text-center text-[10px] text-white">
-              {unreadCount > 99 ? "99+" : unreadCount}
+            <span className="absolute -right-1 -top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-fuchsia-500 text-[10px] font-medium leading-none text-white">
+              {unreadCount > 99 ? "99" : unreadCount}
             </span>
           )}
         </Button>
