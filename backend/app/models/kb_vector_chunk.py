@@ -4,9 +4,17 @@ from datetime import datetime
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, TypeDecorator, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql.type_api import TypeEngine
-from sqlalchemy.types import JSON
+from sqlalchemy.types import JSON, UserDefinedType
 
 from app.core.database import Base
+
+
+class _PgVectorType(UserDefinedType):
+    cache_ok = True
+
+    def get_col_spec(self, **kw) -> str:
+        _ = kw
+        return "vector"
 
 
 class _VectorDbType(TypeDecorator):
@@ -15,7 +23,7 @@ class _VectorDbType(TypeDecorator):
 
     def load_dialect_impl(self, dialect) -> TypeEngine:
         if dialect.name == "postgresql":
-            return dialect.type_descriptor(Text())
+            return dialect.type_descriptor(_PgVectorType())
         return dialect.type_descriptor(Text())
 
     def process_bind_param(self, value: list[float] | None, dialect):

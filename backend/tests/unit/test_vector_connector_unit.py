@@ -1,7 +1,8 @@
 import uuid
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import Text, select
+from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.document import Document
@@ -24,6 +25,15 @@ def test_cosine_similarity():
     assert cosine_similarity([1.0, 0.0], [1.0, 0.0]) == pytest.approx(1.0)
     assert cosine_similarity([1.0, 0.0], [0.0, 1.0]) == pytest.approx(0.0)
     assert cosine_similarity([1.0], [2.0]) == pytest.approx(1.0)
+
+
+def test_kb_vector_chunk_embedding_uses_vector_type_on_postgres():
+    col_type = KbVectorChunk.__table__.c.embedding.type
+    pg_impl = col_type.load_dialect_impl(postgresql.dialect())
+    sqlite_impl = col_type.load_dialect_impl(sqlite.dialect())
+
+    assert pg_impl.get_col_spec().lower() == "vector"
+    assert isinstance(sqlite_impl, Text)
 
 
 @pytest.mark.asyncio
