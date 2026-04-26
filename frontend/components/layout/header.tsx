@@ -8,15 +8,14 @@ import {
   Search,
   Sun,
   Command,
-  Cpu,
   Bell,
   ArrowUpRight,
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { knowledgeBaseApi, providerApi, vectorDbApi } from "@/lib/api";
-import type { KnowledgeBase, Provider, VectorDbConfig } from "@/lib/types";
+import { knowledgeBaseApi, notificationApi, providerApi, vectorDbApi } from "@/lib/api";
+import type { IngestionNotification, KnowledgeBase, Provider, VectorDbConfig } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const pageTitles: Record<string, { title: string; description?: string }> = {
@@ -69,6 +68,19 @@ function includesKeyword(...values: Array<string | undefined>) {
     .toLowerCase();
 }
 
+function formatNotificationTime(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+  return date.toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
@@ -76,6 +88,7 @@ export function Header() {
   const { title, description } = resolveTitle(pathname);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const bellPanelRef = useRef<HTMLDivElement>(null);
 
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -86,6 +99,11 @@ export function Header() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [vectorDbs, setVectorDbs] = useState<VectorDbConfig[]>([]);
+  const [notifications, setNotifications] = useState<IngestionNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationLoading, setNotificationLoading] = useState(false);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -147,15 +165,19 @@ export function Header() {
 
   useEffect(() => {
     const onClickOutside = (event: MouseEvent) => {
-      if (!panelRef.current?.contains(event.target as Node)) {
+      if (
+        !panelRef.current?.contains(event.target as Node) &&
+        !bellPanelRef.current?.contains(event.target as Node)
+      ) {
         setOpen(false);
+        setNotificationOpen(false);
       }
     };
-    if (open) {
+    if (open || notificationOpen) {
       window.addEventListener("mousedown", onClickOutside);
     }
     return () => window.removeEventListener("mousedown", onClickOutside);
-  }, [open]);
+  }, [notificationOpen, open]);
 
   const searchItems = useMemo<SearchItem[]>(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -240,6 +262,54 @@ export function Header() {
     setLoadError(null);
   };
 
+  const loadNotificationList = async () => {
+    setNotificationLoading(true);
+    setNotificationError(null);
+    try {
+      const [listResponse, unreadResponse] = await Promise.all([
+        notificationApi.list(1, 8),
+        notificationApi.unreadCount(),
+      ]);
+      setNotifications(listResponse.items);
+      setUnreadCount(unreadResponse.unread_count);
+    } catch {
+      setNotificationError("加载失败，点击重试");
+    } finally {
+      setNotificationLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadNotificationList();
+    // TODO: Replace polling with SSE/WebSocket push in a future iteration.
+    const timer = window.setInterval(() => {
+      void loadNotificationList();
+    }, 20000);
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        void loadNotificationList();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
+
+  const handleNotificationClick = async (item: IngestionNotification) => {
+    setNotificationOpen(false);
+    if (!item.is_read) {
+      try {
+        await notificationApi.markRead([item.id]);
+      } catch {
+        // Best-effort: navigation should not be blocked by read-state failure.
+      }
+    }
+    void loadNotificationList();
+    router.push(item.action_url as never);
+  };
+
   return (
     <header className="relative z-30 flex h-16 shrink-0 items-center gap-4 border-b border-border/50 bg-background/60 px-6 backdrop-blur-xl">
       <div
@@ -258,17 +328,6 @@ export function Header() {
             </p>
           )}
         </div>
-      </div>
-
-      <div className="hidden items-center gap-1.5 rounded-full border border-primary/20 bg-gradient-to-r from-primary/5 via-fuchsia-500/5 to-cyan-500/5 px-3 py-1 text-[11px] font-medium text-muted-foreground md:inline-flex">
-        <Cpu className="h-3.5 w-3.5 text-primary" />
-        <span className="text-foreground">GPT-4o</span>
-        <span className="mx-0.5 h-3 w-px bg-border" />
-        <span className="relative flex h-1.5 w-1.5">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-70" />
-          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-        </span>
-        <span>就绪</span>
       </div>
 
       <div ref={panelRef} className="relative hidden w-72 lg:block">
@@ -375,15 +434,76 @@ export function Header() {
         )}
       </div>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="通知"
-        className="relative rounded-lg"
-      >
-        <Bell className="h-4 w-4" />
-        <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-fuchsia-500" />
-      </Button>
+      <div ref={bellPanelRef} className="relative">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="通知"
+          className="relative rounded-lg"
+          onClick={() => {
+            setNotificationOpen((prev) => !prev);
+            if (!notificationOpen) {
+              void loadNotificationList();
+            }
+          }}
+        >
+          <Bell className="h-4 w-4" />
+          {unreadCount > 0 && (
+            <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-fuchsia-500 px-1 text-center text-[10px] text-white">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </Button>
+        {notificationOpen && (
+          <div className="absolute right-0 top-10 z-50 w-96 rounded-xl border border-border/70 bg-popover/95 p-2 shadow-2xl backdrop-blur">
+            <div className="mb-1 px-2 py-1 text-xs font-semibold text-foreground">入库通知</div>
+            {notificationLoading && (
+              <div className="flex items-center gap-2 px-2 py-3 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                加载通知中...
+              </div>
+            )}
+            {!notificationLoading && notificationError && (
+              <div className="px-2 py-3 text-xs text-muted-foreground">
+                {notificationError}
+                <button
+                  type="button"
+                  className="ml-2 text-primary hover:underline"
+                  onClick={() => void loadNotificationList()}
+                >
+                  重试
+                </button>
+              </div>
+            )}
+            {!notificationLoading && !notificationError && notifications.length === 0 && (
+              <div className="px-2 py-6 text-center text-xs text-muted-foreground">暂无通知</div>
+            )}
+            {!notificationLoading && !notificationError && notifications.length > 0 && (
+              <div className="max-h-80 space-y-1 overflow-y-auto">
+                {notifications.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => void handleNotificationClick(item)}
+                    className={cn(
+                      "w-full rounded-md px-2 py-2 text-left hover:bg-accent",
+                      !item.is_read && "bg-primary/5",
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-xs font-medium">{item.title}</span>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                        {formatNotificationTime(item.created_at)}
+                      </span>
+                    </div>
+                    <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.message}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <Button
         variant="ghost"

@@ -19,6 +19,7 @@ import type {
   VectorDbCreateInput,
   VectorDbTestResult,
   VectorDbUpdateInput,
+  NotificationListResponse,
 } from "./types";
 
 const BASE = "/api/backend";
@@ -171,4 +172,17 @@ export const knowledgeBaseApi = {
     request<DocumentChunksResponse>(
       `/knowledge-bases/${kbId}/documents/${docId}/chunks?page=${page}&page_size=${pageSize}`,
     ),
+};
+
+export const notificationApi = {
+  list: (page = 1, pageSize = 20, unreadOnly = false) =>
+    request<NotificationListResponse>(
+      `/notifications?page=${page}&page_size=${pageSize}&unread_only=${unreadOnly}`,
+    ),
+  unreadCount: () => request<{ unread_count: number }>("/notifications/unread-count"),
+  markRead: (notificationIds: string[]) =>
+    request<{ updated: number }>("/notifications/mark-read", {
+      method: "POST",
+      body: JSON.stringify({ notification_ids: notificationIds }),
+    }),
 };

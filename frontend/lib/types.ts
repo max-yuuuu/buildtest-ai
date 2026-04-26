@@ -224,3 +224,32 @@ export interface DocumentChunksResponse {
   };
   items: DocumentChunkItem[];
 }
+
+export type NotificationEventType =
+  | "ingestion_completed"
+  | "ingestion_failed"
+  | "ingestion_timeout";
+
+export interface IngestionNotification {
+  id: string;
+  user_id: string;
+  event_type: NotificationEventType;
+  level: "success" | "warning" | "error";
+  title: string;
+  message: string;
+  is_read: boolean;
+  resource_type: string;
+  resource_id: string;
+  knowledge_base_id: string;
+  ingestion_job_id: string;
+  action_url: string;
+  created_at: string;
+  read_at: string | null;
+}
+
+export interface NotificationListResponse {
+  page: number;
+  page_size: number;
+  total: number;
+  items: IngestionNotification[];
+}

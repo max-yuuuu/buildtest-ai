@@ -109,6 +109,10 @@ export default function KnowledgeBasesPage() {
     () => (models ?? []).filter((m: Model) => m.model_type === "embedding"),
     [models],
   );
+  const activeProviders = useMemo(
+    () => (providers ?? []).filter((p: Provider) => p.is_active),
+    [providers],
+  );
 
   const total = kbs?.length ?? 0;
   const docTotal = useMemo(
@@ -254,7 +258,7 @@ export default function KnowledgeBasesPage() {
                   <SelectValue placeholder="选择 Provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(providers ?? []).map((p: Provider) => (
+                  {activeProviders.map((p: Provider) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}
                     </SelectItem>
