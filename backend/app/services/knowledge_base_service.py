@@ -43,6 +43,7 @@ from app.schemas.knowledge_base import (
 from app.services import embedding_client
 from app.services.document_loaders import extract_segments, infer_section_title
 from app.services.ingestion_job_service import IngestionJobService
+from app.services.notification_service import NotificationService
 from app.services.retrieval_strategy import get_retrieval_strategy
 from app.services.vector_connector import VectorChunkItem, vector_connector_for_config
 
@@ -76,6 +77,7 @@ class KnowledgeBaseService:
         self.model_repo = ModelRepository(session, user_id)
         self.provider_repo = ProviderRepository(session, user_id)
         self.ingestion_job_service = IngestionJobService(session, user_id)
+        self.notification_service = NotificationService(session, user_id)
 
     async def _get_vdbc(self, config_id: uuid.UUID) -> VectorDbConfig:
         row = await self.vdb_repo.get(config_id)
@@ -445,6 +447,13 @@ class KnowledgeBaseService:
             await self.ingestion_job_service.fail_job(job_id, "缺少 storage_path，无法入库")
             doc.status = "failed"
             doc.error_message = "缺少 storage_path，无法入库"
+            await self.notification_service.publish_ingestion_failed(
+                kb_id=kb_id,
+                doc_id=doc_id,
+                job_id=job_id,
+                doc_name=doc.file_name,
+                error_message=doc.error_message,
+            )
             await self.session.commit()
             return
         path = Path(settings.upload_dir) / doc.storage_path
@@ -452,12 +461,20 @@ class KnowledgeBaseService:
             await self.ingestion_job_service.fail_job(job_id, "原文文件不存在")
             doc.status = "failed"
             doc.error_message = "原文文件不存在"
+            await self.notification_service.publish_ingestion_failed(
+                kb_id=kb_id,
+                doc_id=doc_id,
+                job_id=job_id,
+                doc_name=doc.file_name,
+                error_message=doc.error_message,
+            )
             await self.session.commit()
             return
         data = path.read_bytes()
         await self._ingest_document(kb, doc, data)
         await self.session.refresh(doc)
         elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        timed_out = elapsed_ms / 1000 >= settings.kb_ingestion_notification_timeout_seconds
         logger.info(
             "ingestion_job_finished",
             extra={
@@ -470,9 +487,27 @@ class KnowledgeBaseService:
             },
         )
         if doc.status == "completed":
+            if timed_out:
+                await self.notification_service.publish_ingestion_timeout(
+                    kb_id=kb_id, doc_id=doc_id, job_id=job_id, doc_name=doc.file_name
+                )
+            await self.notification_service.publish_ingestion_completed(
+                kb_id=kb_id, doc_id=doc_id, job_id=job_id, doc_name=doc.file_name
+            )
             await self.ingestion_job_service.complete_job(job_id)
             await self.session.commit()
             return
+        if timed_out:
+            await self.notification_service.publish_ingestion_timeout(
+                kb_id=kb_id, doc_id=doc_id, job_id=job_id, doc_name=doc.file_name
+            )
+        await self.notification_service.publish_ingestion_failed(
+            kb_id=kb_id,
+            doc_id=doc_id,
+            job_id=job_id,
+            doc_name=doc.file_name,
+            error_message=doc.error_message,
+        )
         await self.ingestion_job_service.fail_job(job_id, doc.error_message or "文档入库失败")
         await self.session.commit()
 

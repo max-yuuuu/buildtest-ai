@@ -17,12 +17,13 @@ class Settings(BaseSettings):
 
     app_encryption_key: str = ""
 
-    upload_max_size_mb: int = 50
+    upload_max_size_mb: int = 500
     upload_dir: str = "/app/uploads"
 
     celery_task_always_eager: bool = False
 
     http_probe_timeout: float = 10.0
+    kb_ingestion_notification_timeout_seconds: int = 600
 
 
 settings = Settings()
