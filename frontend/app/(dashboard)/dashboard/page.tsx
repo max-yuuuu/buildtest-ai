@@ -1,42 +1,23 @@
+"use client";
+
+import { useMemo } from "react";
 import Link from "next/link";
 import {
   ArrowUpRight,
+  CheckCircle2,
+  CircleDashed,
   Database,
   FlaskConical,
   KeyRound,
-  Sparkles,
-  CheckCircle2,
-  CircleDashed,
   Rocket,
+  Sparkles,
 } from "lucide-react";
-import { auth } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
+import { useQuery } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { knowledgeBaseApi, providerApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
-
-const stats = [
-  {
-    label: "Provider",
-    value: "—",
-    hint: "已接入服务商",
-    icon: KeyRound,
-    accent: "bg-primary/10 text-primary",
-  },
-  {
-    label: "知识库",
-    value: "—",
-    hint: "Phase 1",
-    icon: Database,
-    accent: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  },
-  {
-    label: "评测任务",
-    value: "—",
-    hint: "Phase 2",
-    icon: FlaskConical,
-    accent: "bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400",
-  },
-];
 
 const modules = [
   {
@@ -56,12 +37,12 @@ const modules = [
     description: "文档上传、切片、向量化",
     body: "上传文档并关联 embedding 模型,Celery 异步入库后可用于检索与评测。",
     href: "/knowledge-bases",
-    cta: "预览",
-    badge: "开发中",
-    tone: "secondary" as const,
+    cta: "去管理",
+    badge: "可用",
+    tone: "default" as const,
     gradient: "from-sky-400 via-blue-500 to-indigo-500",
     icon: Database,
-    status: "wip" as const,
+    status: "ready" as const,
   },
   {
     title: "评测",
@@ -77,33 +58,76 @@ const modules = [
   },
 ];
 
-const steps = [
-  {
-    step: "01",
-    title: "配置 Provider",
-    desc: "绑定 OpenAI / Anthropic 等服务商,密钥加密托管",
-    icon: KeyRound,
-    done: true,
-  },
-  {
-    step: "02",
-    title: "创建知识库",
-    desc: "上传文档,完成切片与向量化",
-    icon: Database,
-    done: false,
-  },
-  {
-    step: "03",
-    title: "运行评测",
-    desc: "绑定 Dataset × Prompt × Model,输出 Bad Case",
-    icon: FlaskConical,
-    done: false,
-  },
-];
-
-export default async function DashboardPage() {
-  const session = await auth();
+export default function DashboardPage() {
+  const { data: session } = useSession();
+  const { data: providers = [] } = useQuery({
+    queryKey: ["providers"],
+    queryFn: providerApi.list,
+  });
+  const { data: knowledgeBases = [] } = useQuery({
+    queryKey: ["knowledge-bases"],
+    queryFn: knowledgeBaseApi.list,
+  });
   const displayName = session?.user?.name ?? session?.user?.email ?? "开发者";
+  const providerCount = providers.length;
+  const activeProviderCount = providers.filter((p) => p.is_active).length;
+  const knowledgeBaseCount = knowledgeBases.length;
+  const documentTotal = useMemo(
+    () =>
+      knowledgeBases.reduce(
+        (total, kb) => total + (kb.document_count ?? 0),
+        0,
+      ),
+    [knowledgeBases],
+  );
+
+  const stats = [
+    {
+      label: "Provider",
+      value: providerCount,
+      hint: `${activeProviderCount} 个启用`,
+      icon: KeyRound,
+      accent: "bg-primary/10 text-primary",
+    },
+    {
+      label: "知识库",
+      value: knowledgeBaseCount,
+      hint: `${documentTotal} 份文档`,
+      icon: Database,
+      accent: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    },
+    {
+      label: "评测任务",
+      value: 0,
+      hint: "Phase 2 即将上线",
+      icon: FlaskConical,
+      accent: "bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400",
+    },
+  ];
+
+  const steps = [
+    {
+      step: "01",
+      title: "配置 Provider",
+      desc: "绑定 OpenAI / Anthropic 等服务商,密钥加密托管",
+      icon: KeyRound,
+      done: providerCount > 0,
+    },
+    {
+      step: "02",
+      title: "创建知识库",
+      desc: "上传文档,完成切片与向量化",
+      icon: Database,
+      done: knowledgeBaseCount > 0,
+    },
+    {
+      step: "03",
+      title: "运行评测",
+      desc: "绑定 Dataset × Prompt × Model,输出 Bad Case",
+      icon: FlaskConical,
+      done: false,
+    },
+  ];
 
   return (
     <div className="space-y-5 p-4 lg:p-5">
@@ -137,9 +161,9 @@ export default async function DashboardPage() {
             </p>
           </div>
           <Button asChild size="lg" className="shadow-sm">
-            <Link href="/providers">
+            <Link href="/knowledge-bases">
               <Rocket className="mr-2 h-4 w-4" />
-              开始接入 Provider
+              进入知识库
             </Link>
           </Button>
         </div>
