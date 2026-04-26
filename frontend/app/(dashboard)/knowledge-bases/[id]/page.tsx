@@ -17,6 +17,7 @@ import {
   Settings2,
   Sparkles,
   Trash2,
+  Eye,
   Upload,
   XCircle,
 } from "lucide-react";
@@ -398,6 +399,7 @@ export default function KnowledgeBaseDetailPage() {
                                 `/knowledge-bases/${id}/documents/${d.id}/chunks` as Route
                               }
                             >
+                              <Eye className="mr-1 h-3.5 w-3.5" />
                               查看分块
                             </Link>
                           </Button>
@@ -409,6 +411,7 @@ export default function KnowledgeBaseDetailPage() {
                             className="h-7"
                             title="文档处理中，暂不可查看"
                           >
+                            <Eye className="mr-1 h-3.5 w-3.5" />
                             查看分块
                           </Button>
                         )}
