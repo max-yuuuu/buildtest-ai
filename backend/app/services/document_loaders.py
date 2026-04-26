@@ -3,10 +3,30 @@
 from __future__ import annotations
 
 import io
+import re
 import subprocess
 import tempfile
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
+
+
+@dataclass
+class ExtractedSegment:
+    text: str
+    page: int | None = None
+
+
+def infer_section_title(text: str) -> str | None:
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("#"):
+            return line.lstrip("#").strip() or None
+        if re.match(r"^(\d+(\.\d+)*|[一二三四五六七八九十]+)[\.\、\s]", line):
+            return line
+    return None
 
 
 def _extract_doc_via_libreoffice(data: bytes) -> str:
@@ -69,3 +89,21 @@ def extract_text(*, file_name: str, data: bytes) -> str:
     if ext == "doc":
         return _extract_doc_via_libreoffice(data)
     raise ValueError(f"暂不支持的文件类型: .{ext or '?'}")
+
+
+def extract_segments(*, file_name: str, data: bytes) -> list[ExtractedSegment]:
+    ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else ""
+    if ext == "pdf":
+        import pdfplumber
+
+        segments: list[ExtractedSegment] = []
+        with pdfplumber.open(io.BytesIO(data)) as pdf:
+            for idx, page in enumerate(pdf.pages, start=1):
+                t = page.extract_text()
+                if t and t.strip():
+                    segments.append(ExtractedSegment(text=t, page=idx))
+        return segments
+    text = extract_text(file_name=file_name, data=data)
+    if not text.strip():
+        return []
+    return [ExtractedSegment(text=text, page=None)]
