@@ -21,6 +21,8 @@ class VectorChunkItem:
     text: str
     embedding: list[float]
     content_hash: str
+    token_length: int | None = None
+    source_metadata: dict | None = None
 
 
 @dataclass
@@ -92,6 +94,8 @@ class PostgresPgVectorConnector:
                 content_hash=it.content_hash,
                 text=it.text,
                 embedding=it.embedding,
+                token_length=it.token_length,
+                source_metadata=it.source_metadata or {},
             )
             self.session.add(row)
         await self.session.flush()
