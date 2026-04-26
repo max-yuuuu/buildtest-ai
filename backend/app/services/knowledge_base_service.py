@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
+import time
 import uuid
 from math import ceil
 from pathlib import Path
@@ -41,7 +43,10 @@ from app.schemas.knowledge_base import (
 from app.services import embedding_client
 from app.services.document_loaders import extract_segments, infer_section_title
 from app.services.ingestion_job_service import IngestionJobService
+from app.services.retrieval_strategy import get_retrieval_strategy
 from app.services.vector_connector import VectorChunkItem, vector_connector_for_config
+
+logger = logging.getLogger(__name__)
 
 
 def _collection_key(kb: KnowledgeBase, db_type: str) -> str:
@@ -427,6 +432,7 @@ class KnowledgeBaseService:
         doc_id: uuid.UUID,
         job_id: uuid.UUID,
     ) -> None:
+        started_at = time.perf_counter()
         kb = await self._require_kb(kb_id)
         doc = await self.doc_repo.get(kb_id, doc_id)
         if doc is None:
@@ -451,6 +457,18 @@ class KnowledgeBaseService:
         data = path.read_bytes()
         await self._ingest_document(kb, doc, data)
         await self.session.refresh(doc)
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        logger.info(
+            "ingestion_job_finished",
+            extra={
+                "kb_id": str(kb_id),
+                "doc_id": str(doc_id),
+                "job_id": str(job_id),
+                "status": doc.status,
+                "elapsed_ms": elapsed_ms,
+                "chunk_count": doc.chunk_count,
+            },
+        )
         if doc.status == "completed":
             await self.ingestion_job_service.complete_job(job_id)
             await self.session.commit()
@@ -606,6 +624,7 @@ class KnowledgeBaseService:
         await self.session.refresh(doc)
 
     async def retrieve(self, kb_id: uuid.UUID, body: RetrieveRequest) -> RetrieveResponse:
+        started_at = time.perf_counter()
         kb = await self._require_kb(kb_id)
         if kb.embedding_model_id is None:
             raise HTTPException(status_code=500, detail="knowledge base missing embedding model")
@@ -622,6 +641,11 @@ class KnowledgeBaseService:
             if body.similarity_threshold is not None
             else kb.retrieval_similarity_threshold
         )
+        strategy_id = body.strategy_id or "naive.v1"
+        try:
+            strategy = get_retrieval_strategy(strategy_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         qv = (
             await embedding_client.embed_texts(
                 provider_type=p.provider_type,
@@ -633,21 +657,50 @@ class KnowledgeBaseService:
             )
         )[0]
         if len(qv) != kb.embedding_dimension:
-            raise HTTPException(status_code=500, detail="query 向量维度与知识库不一致")
-        hits = await conn.search(
-            collection=key,
-            knowledge_base_id=kb.id,
-            query_vector=qv,
-            top_k=top_k,
-            score_threshold=thr,
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "query 向量维度与知识库配置不一致: "
+                    f"query={len(qv)}, kb={kb.embedding_dimension}"
+                ),
+            )
+        try:
+            hits = await strategy.retrieve(
+                connector=conn,
+                collection=key,
+                knowledge_base_id=kb.id,
+                query_vector=qv,
+                top_k=top_k,
+                similarity_threshold=thr,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        logger.info(
+            "kb_retrieve_finished",
+            extra={
+                "kb_id": str(kb_id),
+                "strategy_id": strategy.strategy_id,
+                "top_k": top_k,
+                "similarity_threshold": thr,
+                "hits_count": len(hits),
+                "elapsed_ms": elapsed_ms,
+            },
         )
         return RetrieveResponse(
+            strategy_id=strategy.strategy_id,
+            retrieval_params={
+                "top_k": top_k,
+                "similarity_threshold": thr,
+            },
             hits=[
                 RetrieveHit(
+                    knowledge_base_id=h.knowledge_base_id,
                     document_id=h.document_id,
                     chunk_index=h.chunk_index,
                     text=h.text,
                     score=h.score,
+                    source=h.source,
                 )
                 for h in hits
             ],

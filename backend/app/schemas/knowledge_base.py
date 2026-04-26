@@ -133,19 +133,24 @@ class IngestionJobRead(BaseModel):
 
 class RetrieveRequest(BaseModel):
     query: str = Field(min_length=1, max_length=8000)
+    strategy_id: str | None = Field(default=None, min_length=1, max_length=64)
     top_k: int | None = Field(default=None, ge=1, le=50)
     similarity_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class RetrieveHit(BaseModel):
+    knowledge_base_id: uuid.UUID | None = None
     document_id: uuid.UUID
     chunk_index: int
     text: str
     score: float
+    source: dict | None = None
 
 
 class RetrieveResponse(BaseModel):
     hits: list[RetrieveHit]
+    strategy_id: str | None = None
+    retrieval_params: dict = Field(default_factory=dict)
 
 
 class RebuildRequest(BaseModel):
