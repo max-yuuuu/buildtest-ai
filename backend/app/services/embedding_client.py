@@ -18,6 +18,19 @@ class EmbeddingError(Exception):
     pass
 
 
+def _strip_slash(url: str) -> str:
+    return url.rstrip("/")
+
+
+def _normalize_ollama_base_url(base_url: str | None) -> str:
+    if not base_url:
+        raise EmbeddingError("ollama provider 需要配置 base_url")
+    u = _strip_slash(base_url.strip())
+    if u.lower().endswith("/v1"):
+        u = u[: -len("/v1")]
+    return _strip_slash(u)
+
+
 def _extract_batch_limit(message: str) -> int | None:
     matched = re.search(r"should not be larger than\s+(\d+)", message, flags=re.IGNORECASE)
     if matched:
@@ -47,8 +60,76 @@ async def embed_texts(
     texts: list[str],
     batch_size: int | None = None,
 ) -> list[list[float]]:
-    if provider_type not in ("openai", "azure"):
+    if provider_type not in ("openai", "azure", "ollama"):
         raise EmbeddingError(f"embedding 尚未支持 provider_type={provider_type}")
+
+    if provider_type == "ollama":
+        import httpx
+
+        effective_url = _normalize_ollama_base_url(base_url)
+        out: list[list[float]] = []
+        batch = batch_size if batch_size and batch_size > 0 else DEFAULT_BATCH_SIZE
+        idx = 0
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                while idx < len(texts):
+                    chunk = texts[idx : idx + batch]
+                    # Prefer the batch endpoint; fall back to legacy single-prompt endpoint.
+                    resp = await client.post(
+                        f"{effective_url}/api/embed",
+                        json={"model": model_id, "input": chunk},
+                    )
+                    if resp.status_code == 404:
+                        embeddings: list[list[float]] = []
+                        for t in chunk:
+                            r = await client.post(
+                                f"{effective_url}/api/embeddings",
+                                json={"model": model_id, "prompt": t},
+                            )
+                            if r.status_code >= 400:
+                                raise EmbeddingError(
+                                    f"embedding 接口返回错误 HTTP {r.status_code}: {r.text[:200]} "
+                                    f"(base_url={effective_url}, model={model_id})"
+                                )
+                            data = r.json()
+                            vec = data.get("embedding")
+                            if not isinstance(vec, list) or not vec:
+                                raise EmbeddingError("embedding 返回格式异常: 缺少 embedding 字段")
+                            embeddings.append([float(x) for x in vec])
+                    elif resp.status_code >= 400:
+                        raise EmbeddingError(
+                            f"embedding 接口返回错误 HTTP {resp.status_code}: {resp.text[:200]} "
+                            f"(base_url={effective_url}, model={model_id})"
+                        )
+                    else:
+                        data = resp.json()
+                        embs = data.get("embeddings")
+                        if not isinstance(embs, list) or not embs:
+                            raise EmbeddingError("embedding 返回格式异常: 缺少 embeddings 字段")
+                        embeddings = [[float(x) for x in vec] for vec in embs]
+
+                    out.extend(embeddings)
+                    idx += len(chunk)
+        except httpx.HTTPError as e:
+            hint = (
+                "；请检查：1) embedding 服务是否启动 2) base_url/端口是否正确 "
+                "3) 网络是否可达(容器内与宿主机不同)"
+            )
+            lower = effective_url.lower()
+            if "localhost" in lower or "127.0.0.1" in lower:
+                hint = (
+                    "；若后端运行在 docker 容器中，请将 base_url 配置为 "
+                    "`http://host.docker.internal:11434`(macOS/Windows) 或宿主机 IP，"
+                    "不要用容器内的 localhost"
+                )
+            raise EmbeddingError(
+                f"连接 embedding 接口失败: {type(e).__name__}: {e} "
+                f"(base_url={effective_url}, model={model_id}){hint}"
+            ) from e
+
+        if len(out) != len(texts):
+            raise EmbeddingError("embedding 返回条数与输入不一致")
+        return out
 
     import httpx
     from openai import APIConnectionError, APIStatusError, AsyncOpenAI
