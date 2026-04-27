@@ -2,9 +2,9 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-ProviderType = Literal["openai", "anthropic", "azure", "zhipu", "qwen"]
+ProviderType = Literal["openai", "anthropic", "azure", "zhipu", "qwen", "ollama"]
 
 
 class ProviderBase(BaseModel):
@@ -15,7 +15,13 @@ class ProviderBase(BaseModel):
 
 
 class ProviderCreate(ProviderBase):
-    api_key: str = Field(min_length=1)
+    api_key: str = Field(default="")
+
+    @model_validator(mode="after")
+    def _validate_api_key_required(self) -> "ProviderCreate":
+        if self.provider_type != "ollama" and not self.api_key:
+            raise ValueError("api_key is required")
+        return self
 
 
 class ProviderUpdate(BaseModel):

@@ -4,1883 +4,2580 @@
  */
 
 export interface paths {
-    "/healthz": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Healthz */
-        get: operations["healthz_healthz_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+  '/healthz': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/readyz": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Readyz */
-        get: operations["readyz_readyz_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** Healthz */
+    get: operations['healthz_healthz_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/readyz': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/users/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Me */
-        get: operations["get_me_api_v1_users_me_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** Readyz */
+    get: operations['readyz_readyz_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/users/me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/providers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Providers */
-        get: operations["list_providers_api_v1_providers_get"];
-        put?: never;
-        /** Create Provider */
-        post: operations["create_provider_api_v1_providers_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** Get Me */
+    get: operations['get_me_api_v1_users_me_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/providers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/providers/{provider_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Provider */
-        get: operations["get_provider_api_v1_providers__provider_id__get"];
-        /** Update Provider */
-        put: operations["update_provider_api_v1_providers__provider_id__put"];
-        post?: never;
-        /** Delete Provider */
-        delete: operations["delete_provider_api_v1_providers__provider_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** List Providers */
+    get: operations['list_providers_api_v1_providers_get'];
+    put?: never;
+    /** Create Provider */
+    post: operations['create_provider_api_v1_providers_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/providers/{provider_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/providers/{provider_id}/test": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Test Provider */
-        post: operations["test_provider_api_v1_providers__provider_id__test_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** Get Provider */
+    get: operations['get_provider_api_v1_providers__provider_id__get'];
+    /** Update Provider */
+    put: operations['update_provider_api_v1_providers__provider_id__put'];
+    post?: never;
+    /** Delete Provider */
+    delete: operations['delete_provider_api_v1_providers__provider_id__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/providers/{provider_id}/test': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/providers/{provider_id}/models": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Models */
-        get: operations["list_models_api_v1_providers__provider_id__models_get"];
-        put?: never;
-        /** Create Model */
-        post: operations["create_model_api_v1_providers__provider_id__models_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /** Test Provider */
+    post: operations['test_provider_api_v1_providers__provider_id__test_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/providers/{provider_id}/models': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/providers/{provider_id}/models/available": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Available Models */
-        get: operations["list_available_models_api_v1_providers__provider_id__models_available_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** List Models */
+    get: operations['list_models_api_v1_providers__provider_id__models_get'];
+    put?: never;
+    /** Create Model */
+    post: operations['create_model_api_v1_providers__provider_id__models_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/providers/{provider_id}/models/available': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/providers/{provider_id}/models/{model_pk}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Model */
-        get: operations["get_model_api_v1_providers__provider_id__models__model_pk__get"];
-        /** Update Model */
-        put: operations["update_model_api_v1_providers__provider_id__models__model_pk__put"];
-        post?: never;
-        /** Delete Model */
-        delete: operations["delete_model_api_v1_providers__provider_id__models__model_pk__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** List Available Models */
+    get: operations['list_available_models_api_v1_providers__provider_id__models_available_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/providers/{provider_id}/models/{model_pk}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/vector-dbs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Vector Dbs */
-        get: operations["list_vector_dbs_api_v1_vector_dbs_get"];
-        put?: never;
-        /** Create Vector Db */
-        post: operations["create_vector_db_api_v1_vector_dbs_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** Get Model */
+    get: operations['get_model_api_v1_providers__provider_id__models__model_pk__get'];
+    /** Update Model */
+    put: operations['update_model_api_v1_providers__provider_id__models__model_pk__put'];
+    post?: never;
+    /** Delete Model */
+    delete: operations['delete_model_api_v1_providers__provider_id__models__model_pk__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/providers/{provider_id}/models/dimension-probe': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/vector-dbs/{config_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Vector Db */
-        get: operations["get_vector_db_api_v1_vector_dbs__config_id__get"];
-        /** Update Vector Db */
-        put: operations["update_vector_db_api_v1_vector_dbs__config_id__put"];
-        post?: never;
-        /** Delete Vector Db */
-        delete: operations["delete_vector_db_api_v1_vector_dbs__config_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /** Probe Embedding Dimension */
+    post: operations['probe_embedding_dimension_api_v1_providers__provider_id__models_dimension_probe_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/vector-dbs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/vector-dbs/{config_id}/test": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Test Vector Db */
-        post: operations["test_vector_db_api_v1_vector_dbs__config_id__test_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** List Vector Dbs */
+    get: operations['list_vector_dbs_api_v1_vector_dbs_get'];
+    put?: never;
+    /** Create Vector Db */
+    post: operations['create_vector_db_api_v1_vector_dbs_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/vector-dbs/{config_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/knowledge-bases": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Knowledge Bases */
-        get: operations["list_knowledge_bases_api_v1_knowledge_bases_get"];
-        put?: never;
-        /** Create Knowledge Base */
-        post: operations["create_knowledge_base_api_v1_knowledge_bases_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** Get Vector Db */
+    get: operations['get_vector_db_api_v1_vector_dbs__config_id__get'];
+    /** Update Vector Db */
+    put: operations['update_vector_db_api_v1_vector_dbs__config_id__put'];
+    post?: never;
+    /** Delete Vector Db */
+    delete: operations['delete_vector_db_api_v1_vector_dbs__config_id__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/vector-dbs/{config_id}/test': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/knowledge-bases/{kb_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Knowledge Base */
-        get: operations["get_knowledge_base_api_v1_knowledge_bases__kb_id__get"];
-        /** Update Knowledge Base */
-        put: operations["update_knowledge_base_api_v1_knowledge_bases__kb_id__put"];
-        post?: never;
-        /** Delete Knowledge Base */
-        delete: operations["delete_knowledge_base_api_v1_knowledge_bases__kb_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /** Test Vector Db */
+    post: operations['test_vector_db_api_v1_vector_dbs__config_id__test_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notifications': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/knowledge-bases/{kb_id}/documents": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Documents */
-        get: operations["list_documents_api_v1_knowledge_bases__kb_id__documents_get"];
-        put?: never;
-        /** Upload Document */
-        post: operations["upload_document_api_v1_knowledge_bases__kb_id__documents_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** List Notifications */
+    get: operations['list_notifications_api_v1_notifications_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notifications/unread-count': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Delete Document */
-        delete: operations["delete_document_api_v1_knowledge_bases__kb_id__documents__doc_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** Unread Count */
+    get: operations['unread_count_api_v1_notifications_unread_count_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/notifications/mark-read': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/knowledge-bases/{kb_id}/retrieve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Retrieve */
-        post: operations["retrieve_api_v1_knowledge_bases__kb_id__retrieve_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /** Mark Read */
+    post: operations['mark_read_api_v1_notifications_mark_read_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/knowledge-bases': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/knowledge-bases/{kb_id}/rebuild": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Rebuild */
-        post: operations["rebuild_api_v1_knowledge_bases__kb_id__rebuild_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** List Knowledge Bases */
+    get: operations['list_knowledge_bases_api_v1_knowledge_bases_get'];
+    put?: never;
+    /** Create Knowledge Base */
+    post: operations['create_knowledge_base_api_v1_knowledge_bases_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/knowledge-bases/{kb_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    /** Get Knowledge Base */
+    get: operations['get_knowledge_base_api_v1_knowledge_bases__kb_id__get'];
+    /** Update Knowledge Base */
+    put: operations['update_knowledge_base_api_v1_knowledge_bases__kb_id__put'];
+    post?: never;
+    /** Delete Knowledge Base */
+    delete: operations['delete_knowledge_base_api_v1_knowledge_bases__kb_id__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/knowledge-bases/{kb_id}/documents': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Documents */
+    get: operations['list_documents_api_v1_knowledge_bases__kb_id__documents_get'];
+    put?: never;
+    /** Upload Document */
+    post: operations['upload_document_api_v1_knowledge_bases__kb_id__documents_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/knowledge-bases/{kb_id}/documents/batch': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Upload Documents */
+    post: operations['upload_documents_api_v1_knowledge_bases__kb_id__documents_batch_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete Document */
+    delete: operations['delete_document_api_v1_knowledge_bases__kb_id__documents__doc_id__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}/ingestion-job': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Latest Ingestion Job */
+    get: operations['get_latest_ingestion_job_api_v1_knowledge_bases__kb_id__documents__doc_id__ingestion_job_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}/chunks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Document Chunks */
+    get: operations['get_document_chunks_api_v1_knowledge_bases__kb_id__documents__doc_id__chunks_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}/ingestion-job/retry': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Retry Latest Ingestion Job */
+    post: operations['retry_latest_ingestion_job_api_v1_knowledge_bases__kb_id__documents__doc_id__ingestion_job_retry_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/knowledge-bases/{kb_id}/retrieve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Retrieve */
+    post: operations['retrieve_api_v1_knowledge_bases__kb_id__retrieve_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/knowledge-bases/{kb_id}/rebuild': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Rebuild */
+    post: operations['rebuild_api_v1_knowledge_bases__kb_id__rebuild_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: {
-        /**
-         * AvailableModel
-         * @description 上游 provider 可用模型条目。is_registered 标记本地已登记,便于前端区分。
-         */
-        AvailableModel: {
-            /** Model Id */
-            model_id: string;
-            /** Suggested Type */
-            suggested_type?: ("llm" | "embedding") | null;
-            /**
-             * Is Registered
-             * @default false
-             */
-            is_registered: boolean;
-        };
-        /** Body_upload_document_api_v1_knowledge_bases__kb_id__documents_post */
-        Body_upload_document_api_v1_knowledge_bases__kb_id__documents_post: {
-            /**
-             * File
-             * Format: binary
-             */
-            file: string;
-        };
-        /** DocumentRead */
-        DocumentRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Knowledge Base Id
-             * Format: uuid
-             */
-            knowledge_base_id: string;
-            /** File Name */
-            file_name: string;
-            /** File Type */
-            file_type: string | null;
-            /** File Size */
-            file_size: number | null;
-            /** Status */
-            status: string;
-            /** Chunk Count */
-            chunk_count: number;
-            /** Error Message */
-            error_message: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
-        };
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
-        };
-        /** KnowledgeBaseCreate */
-        KnowledgeBaseCreate: {
-            /** Name */
-            name: string;
-            /** Description */
-            description?: string | null;
-            /**
-             * Vector Db Config Id
-             * Format: uuid
-             */
-            vector_db_config_id: string;
-            /**
-             * Embedding Model Id
-             * Format: uuid
-             */
-            embedding_model_id: string;
-            /**
-             * Chunk Size
-             * @default 512
-             */
-            chunk_size: number;
-            /**
-             * Chunk Overlap
-             * @default 50
-             */
-            chunk_overlap: number;
-            /**
-             * Retrieval Top K
-             * @default 5
-             */
-            retrieval_top_k: number;
-            /**
-             * Retrieval Similarity Threshold
-             * @default 0.7
-             */
-            retrieval_similarity_threshold: number;
-            /** Retrieval Config */
-            retrieval_config?: Record<string, never>;
-        };
-        /** KnowledgeBaseRead */
-        KnowledgeBaseRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * User Id
-             * Format: uuid
-             */
-            user_id: string;
-            /** Name */
-            name: string;
-            /** Description */
-            description: string | null;
-            /**
-             * Vector Db Config Id
-             * Format: uuid
-             */
-            vector_db_config_id: string;
-            /** Collection Name */
-            collection_name: string;
-            /**
-             * Embedding Model Id
-             * Format: uuid
-             */
-            embedding_model_id: string;
-            /** Embedding Dimension */
-            embedding_dimension: number;
-            /** Chunk Size */
-            chunk_size: number;
-            /** Chunk Overlap */
-            chunk_overlap: number;
-            /** Retrieval Top K */
-            retrieval_top_k: number;
-            /** Retrieval Similarity Threshold */
-            retrieval_similarity_threshold: number;
-            /** Retrieval Config */
-            retrieval_config: Record<string, never>;
-            /**
-             * Document Count
-             * @default 0
-             */
-            document_count: number;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
-        };
-        /** KnowledgeBaseUpdate */
-        KnowledgeBaseUpdate: {
-            /** Name */
-            name?: string | null;
-            /** Description */
-            description?: string | null;
-            /** Embedding Model Id */
-            embedding_model_id?: string | null;
-            /** Chunk Size */
-            chunk_size?: number | null;
-            /** Chunk Overlap */
-            chunk_overlap?: number | null;
-            /** Retrieval Top K */
-            retrieval_top_k?: number | null;
-            /** Retrieval Similarity Threshold */
-            retrieval_similarity_threshold?: number | null;
-            /** Retrieval Config */
-            retrieval_config?: Record<string, never> | null;
-        };
-        /** ModelCreate */
-        ModelCreate: {
-            /** Model Id */
-            model_id: string;
-            /**
-             * Model Type
-             * @enum {string}
-             */
-            model_type: "llm" | "embedding";
-            /** Context Window */
-            context_window?: number | null;
-            /** Vector Dimension */
-            vector_dimension?: number | null;
-            /** Embedding Batch Size */
-            embedding_batch_size?: number | null;
-        };
-        /** ModelRead */
-        ModelRead: {
-            /** Model Id */
-            model_id: string;
-            /**
-             * Model Type
-             * @enum {string}
-             */
-            model_type: "llm" | "embedding";
-            /** Context Window */
-            context_window?: number | null;
-            /** Vector Dimension */
-            vector_dimension?: number | null;
-            /** Embedding Batch Size */
-            embedding_batch_size?: number | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Provider Id
-             * Format: uuid
-             */
-            provider_id: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-        };
-        /** ModelUpdate */
-        ModelUpdate: {
-            /** Model Type */
-            model_type?: ("llm" | "embedding") | null;
-            /** Context Window */
-            context_window?: number | null;
-            /** Vector Dimension */
-            vector_dimension?: number | null;
-            /** Embedding Batch Size */
-            embedding_batch_size?: number | null;
-        };
-        /** ProviderCreate */
-        ProviderCreate: {
-            /** Name */
-            name: string;
-            /**
-             * Provider Type
-             * @enum {string}
-             */
-            provider_type: "openai" | "anthropic" | "azure" | "zhipu" | "qwen";
-            /** Base Url */
-            base_url?: string | null;
-            /**
-             * Is Active
-             * @default true
-             */
-            is_active: boolean;
-            /** Api Key */
-            api_key: string;
-        };
-        /**
-         * ProviderRead
-         * @description 对外暴露的视图,不返回明文 api_key,只返回 mask。
-         */
-        ProviderRead: {
-            /** Name */
-            name: string;
-            /**
-             * Provider Type
-             * @enum {string}
-             */
-            provider_type: "openai" | "anthropic" | "azure" | "zhipu" | "qwen";
-            /** Base Url */
-            base_url?: string | null;
-            /**
-             * Is Active
-             * @default true
-             */
-            is_active: boolean;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * User Id
-             * Format: uuid
-             */
-            user_id: string;
-            /** Api Key Mask */
-            api_key_mask: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
-        };
-        /**
-         * ProviderTestResult
-         * @description 连通性测试结果。ok=False 仍返回 200,HTTP 错误码只用于 provider 不存在 / 未授权。
-         */
-        ProviderTestResult: {
-            /** Ok */
-            ok: boolean;
-            /** Latency Ms */
-            latency_ms: number;
-            /** Message */
-            message: string;
-            /** Models */
-            models?: string[];
-        };
-        /** ProviderUpdate */
-        ProviderUpdate: {
-            /** Name */
-            name?: string | null;
-            /** Api Key */
-            api_key?: string | null;
-            /** Base Url */
-            base_url?: string | null;
-            /** Is Active */
-            is_active?: boolean | null;
-        };
-        /** RebuildRequest */
-        RebuildRequest: {
-            /** Document Id */
-            document_id?: string | null;
-        };
-        /** RetrieveHit */
-        RetrieveHit: {
-            /**
-             * Document Id
-             * Format: uuid
-             */
-            document_id: string;
-            /** Chunk Index */
-            chunk_index: number;
-            /** Text */
-            text: string;
-            /** Score */
-            score: number;
-        };
-        /** RetrieveRequest */
-        RetrieveRequest: {
-            /** Query */
-            query: string;
-            /** Top K */
-            top_k?: number | null;
-            /** Similarity Threshold */
-            similarity_threshold?: number | null;
-        };
-        /** RetrieveResponse */
-        RetrieveResponse: {
-            /** Hits */
-            hits: components["schemas"]["RetrieveHit"][];
-        };
-        /** UserRead */
-        UserRead: {
-            /**
-             * Email
-             * Format: email
-             */
-            email: string;
-            /** Name */
-            name?: string | null;
-            /** Avatar Url */
-            avatar_url?: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** External Id */
-            external_id: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
-        };
-        /** ValidationError */
-        ValidationError: {
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
-        };
-        /** VectorDbCreate */
-        VectorDbCreate: {
-            /** Name */
-            name: string;
-            /**
-             * Db Type
-             * @enum {string}
-             */
-            db_type: "postgres_pgvector" | "qdrant" | "milvus" | "weaviate" | "pinecone" | "chroma";
-            /**
-             * Is Active
-             * @default true
-             */
-            is_active: boolean;
-            /** Connection String */
-            connection_string: string;
-            /** Api Key */
-            api_key?: string | null;
-        };
-        /** VectorDbRead */
-        VectorDbRead: {
-            /** Name */
-            name: string;
-            /**
-             * Db Type
-             * @enum {string}
-             */
-            db_type: "postgres_pgvector" | "qdrant" | "milvus" | "weaviate" | "pinecone" | "chroma";
-            /**
-             * Is Active
-             * @default true
-             */
-            is_active: boolean;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * User Id
-             * Format: uuid
-             */
-            user_id: string;
-            /** Connection String Mask */
-            connection_string_mask: string;
-            /** Api Key Mask */
-            api_key_mask?: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
-        };
-        /** VectorDbTestResult */
-        VectorDbTestResult: {
-            /** Ok */
-            ok: boolean;
-            /** Latency Ms */
-            latency_ms: number;
-            /** Message */
-            message: string;
-        };
-        /** VectorDbUpdate */
-        VectorDbUpdate: {
-            /** Name */
-            name?: string | null;
-            /** Connection String */
-            connection_string?: string | null;
-            /** Api Key */
-            api_key?: string | null;
-            /** Is Active */
-            is_active?: boolean | null;
-        };
+  schemas: {
+    /**
+     * AvailableModel
+     * @description 上游 provider 可用模型条目。is_registered 标记本地已登记,便于前端区分。
+     */
+    AvailableModel: {
+      /** Model Id */
+      model_id: string;
+      /** Suggested Type */
+      suggested_type?: ('llm' | 'embedding') | null;
+      /**
+       * Is Registered
+       * @default false
+       */
+      is_registered: boolean;
     };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+    /** BatchUploadResponse */
+    BatchUploadResponse: {
+      /** Created Count */
+      created_count: number;
+      /** Documents */
+      documents: components['schemas']['DocumentRead'][];
+    };
+    /** Body_upload_document_api_v1_knowledge_bases__kb_id__documents_post */
+    Body_upload_document_api_v1_knowledge_bases__kb_id__documents_post: {
+      /**
+       * File
+       * Format: binary
+       */
+      file: string;
+    };
+    /** Body_upload_documents_api_v1_knowledge_bases__kb_id__documents_batch_post */
+    Body_upload_documents_api_v1_knowledge_bases__kb_id__documents_batch_post: {
+      /** Files */
+      files: string[];
+    };
+    /** DocumentChunkDocumentRead */
+    DocumentChunkDocumentRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Knowledge Base Id
+       * Format: uuid
+       */
+      knowledge_base_id: string;
+      /** Name */
+      name: string;
+      /** Status */
+      status: string;
+      /** Ingestion Job Id */
+      ingestion_job_id?: string | null;
+      /** Completed At */
+      completed_at?: string | null;
+    };
+    /** DocumentChunkPaginationRead */
+    DocumentChunkPaginationRead: {
+      /** Page */
+      page: number;
+      /** Page Size */
+      page_size: number;
+      /** Total */
+      total: number;
+      /** Total Pages */
+      total_pages: number;
+    };
+    /** DocumentChunkRead */
+    DocumentChunkRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Chunk Index */
+      chunk_index: number;
+      /** Char Length */
+      char_length: number;
+      /** Token Length */
+      token_length?: number | null;
+      /** Preview Text */
+      preview_text?: string | null;
+      /** Source */
+      source?: Record<string, never>;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** DocumentChunkSummaryRead */
+    DocumentChunkSummaryRead: {
+      /** Total Chunks */
+      total_chunks: number;
+      /** Avg Char Length */
+      avg_char_length?: number | null;
+      /** Min Char Length */
+      min_char_length?: number | null;
+      /** Max Char Length */
+      max_char_length?: number | null;
+    };
+    /** DocumentChunksResponse */
+    DocumentChunksResponse: {
+      document: components['schemas']['DocumentChunkDocumentRead'];
+      chunk_summary: components['schemas']['DocumentChunkSummaryRead'];
+      pagination: components['schemas']['DocumentChunkPaginationRead'];
+      /** Items */
+      items: components['schemas']['DocumentChunkRead'][];
+    };
+    /** DocumentRead */
+    DocumentRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Knowledge Base Id
+       * Format: uuid
+       */
+      knowledge_base_id: string;
+      /** File Name */
+      file_name: string;
+      /** File Type */
+      file_type: string | null;
+      /** File Size */
+      file_size: number | null;
+      /** Status */
+      status: string;
+      /** Chunk Count */
+      chunk_count: number;
+      /** Error Message */
+      error_message: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+      /** Ingestion Job Id */
+      ingestion_job_id?: string | null;
+      /** Ingestion Job Status */
+      ingestion_job_status?: string | null;
+      /** Ingestion Attempt Count */
+      ingestion_attempt_count?: number | null;
+    };
+    /** EmbeddingDimensionProbeRequest */
+    EmbeddingDimensionProbeRequest: {
+      /** Model Id */
+      model_id: string;
+    };
+    /** EmbeddingDimensionProbeResponse */
+    EmbeddingDimensionProbeResponse: {
+      /** Model Id */
+      model_id: string;
+      /** Vector Dimension */
+      vector_dimension: number;
+    };
+    /** HTTPValidationError */
+    HTTPValidationError: {
+      /** Detail */
+      detail?: components['schemas']['ValidationError'][];
+    };
+    /** IngestionJobRead */
+    IngestionJobRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * User Id
+       * Format: uuid
+       */
+      user_id: string;
+      /**
+       * Knowledge Base Id
+       * Format: uuid
+       */
+      knowledge_base_id: string;
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      document_id: string;
+      /** Status */
+      status: string;
+      /** Attempt Count */
+      attempt_count: number;
+      /** Max Retries */
+      max_retries: number;
+      /** Error Message */
+      error_message: string | null;
+      /**
+       * Queued At
+       * Format: date-time
+       */
+      queued_at: string;
+      /** Started At */
+      started_at: string | null;
+      /** Finished At */
+      finished_at: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+    };
+    /** KnowledgeBaseCreate */
+    KnowledgeBaseCreate: {
+      /** Name */
+      name: string;
+      /** Description */
+      description?: string | null;
+      /**
+       * Vector Db Config Id
+       * Format: uuid
+       */
+      vector_db_config_id: string;
+      /**
+       * Embedding Model Id
+       * Format: uuid
+       */
+      embedding_model_id: string;
+      /**
+       * Chunk Size
+       * @default 512
+       */
+      chunk_size: number;
+      /**
+       * Chunk Overlap
+       * @default 50
+       */
+      chunk_overlap: number;
+      /**
+       * Retrieval Top K
+       * @default 5
+       */
+      retrieval_top_k: number;
+      /**
+       * Retrieval Similarity Threshold
+       * @default 0.4
+       */
+      retrieval_similarity_threshold: number;
+      /** Retrieval Config */
+      retrieval_config?: Record<string, never>;
+    };
+    /** KnowledgeBaseRead */
+    KnowledgeBaseRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * User Id
+       * Format: uuid
+       */
+      user_id: string;
+      /** Name */
+      name: string;
+      /** Description */
+      description: string | null;
+      /**
+       * Vector Db Config Id
+       * Format: uuid
+       */
+      vector_db_config_id: string;
+      /** Collection Name */
+      collection_name: string;
+      /**
+       * Embedding Model Id
+       * Format: uuid
+       */
+      embedding_model_id: string;
+      /** Embedding Dimension */
+      embedding_dimension: number;
+      /** Chunk Size */
+      chunk_size: number;
+      /** Chunk Overlap */
+      chunk_overlap: number;
+      /** Retrieval Top K */
+      retrieval_top_k: number;
+      /** Retrieval Similarity Threshold */
+      retrieval_similarity_threshold: number;
+      /** Retrieval Config */
+      retrieval_config: Record<string, never>;
+      /**
+       * Document Count
+       * @default 0
+       */
+      document_count: number;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+    };
+    /** KnowledgeBaseUpdate */
+    KnowledgeBaseUpdate: {
+      /** Name */
+      name?: string | null;
+      /** Description */
+      description?: string | null;
+      /** Embedding Model Id */
+      embedding_model_id?: string | null;
+      /** Chunk Size */
+      chunk_size?: number | null;
+      /** Chunk Overlap */
+      chunk_overlap?: number | null;
+      /** Retrieval Top K */
+      retrieval_top_k?: number | null;
+      /** Retrieval Similarity Threshold */
+      retrieval_similarity_threshold?: number | null;
+      /** Retrieval Config */
+      retrieval_config?: Record<string, never> | null;
+    };
+    /** MarkReadRequest */
+    MarkReadRequest: {
+      /** Notification Ids */
+      notification_ids?: string[];
+    };
+    /** MarkReadResponse */
+    MarkReadResponse: {
+      /** Updated */
+      updated: number;
+    };
+    /** ModelCreate */
+    ModelCreate: {
+      /** Model Id */
+      model_id: string;
+      /**
+       * Model Type
+       * @enum {string}
+       */
+      model_type: 'llm' | 'embedding';
+      /** Context Window */
+      context_window?: number | null;
+      /** Vector Dimension */
+      vector_dimension?: number | null;
+      /** Embedding Batch Size */
+      embedding_batch_size?: number | null;
+    };
+    /** ModelRead */
+    ModelRead: {
+      /** Model Id */
+      model_id: string;
+      /**
+       * Model Type
+       * @enum {string}
+       */
+      model_type: 'llm' | 'embedding';
+      /** Context Window */
+      context_window?: number | null;
+      /** Vector Dimension */
+      vector_dimension?: number | null;
+      /** Embedding Batch Size */
+      embedding_batch_size?: number | null;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Provider Id
+       * Format: uuid
+       */
+      provider_id: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** ModelUpdate */
+    ModelUpdate: {
+      /** Model Type */
+      model_type?: ('llm' | 'embedding') | null;
+      /** Context Window */
+      context_window?: number | null;
+      /** Vector Dimension */
+      vector_dimension?: number | null;
+      /** Embedding Batch Size */
+      embedding_batch_size?: number | null;
+    };
+    /** NotificationListResponse */
+    NotificationListResponse: {
+      /** Page */
+      page: number;
+      /** Page Size */
+      page_size: number;
+      /** Total */
+      total: number;
+      /** Items */
+      items: components['schemas']['NotificationRead'][];
+    };
+    /** NotificationRead */
+    NotificationRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * User Id
+       * Format: uuid
+       */
+      user_id: string;
+      /** Event Type */
+      event_type: string;
+      /** Level */
+      level: string;
+      /** Title */
+      title: string;
+      /** Message */
+      message: string;
+      /** Is Read */
+      is_read: boolean;
+      /** Resource Type */
+      resource_type: string;
+      /**
+       * Resource Id
+       * Format: uuid
+       */
+      resource_id: string;
+      /**
+       * Knowledge Base Id
+       * Format: uuid
+       */
+      knowledge_base_id: string;
+      /**
+       * Ingestion Job Id
+       * Format: uuid
+       */
+      ingestion_job_id: string;
+      /** Action Url */
+      action_url: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Read At */
+      read_at: string | null;
+    };
+    /** ProviderCreate */
+    ProviderCreate: {
+      /** Name */
+      name: string;
+      /**
+       * Provider Type
+       * @enum {string}
+       */
+      provider_type:
+        | 'openai'
+        | 'anthropic'
+        | 'azure'
+        | 'zhipu'
+        | 'qwen'
+        | 'ollama';
+      /** Base Url */
+      base_url?: string | null;
+      /**
+       * Is Active
+       * @default true
+       */
+      is_active: boolean;
+      /** Api Key */
+      api_key: string;
+    };
+    /**
+     * ProviderRead
+     * @description 对外暴露的视图,不返回明文 api_key,只返回 mask。
+     */
+    ProviderRead: {
+      /** Name */
+      name: string;
+      /**
+       * Provider Type
+       * @enum {string}
+       */
+      provider_type:
+        | 'openai'
+        | 'anthropic'
+        | 'azure'
+        | 'zhipu'
+        | 'qwen'
+        | 'ollama';
+      /** Base Url */
+      base_url?: string | null;
+      /**
+       * Is Active
+       * @default true
+       */
+      is_active: boolean;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * User Id
+       * Format: uuid
+       */
+      user_id: string;
+      /** Api Key Mask */
+      api_key_mask: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+    };
+    /**
+     * ProviderTestResult
+     * @description 连通性测试结果。ok=False 仍返回 200,HTTP 错误码只用于 provider 不存在 / 未授权。
+     */
+    ProviderTestResult: {
+      /** Ok */
+      ok: boolean;
+      /** Latency Ms */
+      latency_ms: number;
+      /** Message */
+      message: string;
+      /** Models */
+      models?: string[];
+    };
+    /** ProviderUpdate */
+    ProviderUpdate: {
+      /** Name */
+      name?: string | null;
+      /** Api Key */
+      api_key?: string | null;
+      /** Base Url */
+      base_url?: string | null;
+      /** Is Active */
+      is_active?: boolean | null;
+    };
+    /** RebuildRequest */
+    RebuildRequest: {
+      /** Document Id */
+      document_id?: string | null;
+    };
+    /** RetrieveHit */
+    RetrieveHit: {
+      /** Knowledge Base Id */
+      knowledge_base_id?: string | null;
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      document_id: string;
+      /** Chunk Index */
+      chunk_index: number;
+      /** Text */
+      text: string;
+      /** Score */
+      score: number;
+      /** Source */
+      source?: Record<string, never> | null;
+    };
+    /** RetrieveRequest */
+    RetrieveRequest: {
+      /** Query */
+      query: string;
+      /** Strategy Id */
+      strategy_id?: string | null;
+      /** Top K */
+      top_k?: number | null;
+      /** Similarity Threshold */
+      similarity_threshold?: number | null;
+    };
+    /** RetrieveResponse */
+    RetrieveResponse: {
+      /** Hits */
+      hits: components['schemas']['RetrieveHit'][];
+      /** Strategy Id */
+      strategy_id?: string | null;
+      /** Retrieval Params */
+      retrieval_params?: Record<string, never>;
+    };
+    /** UnreadCountResponse */
+    UnreadCountResponse: {
+      /** Unread Count */
+      unread_count: number;
+    };
+    /** UserRead */
+    UserRead: {
+      /**
+       * Email
+       * Format: email
+       */
+      email: string;
+      /** Name */
+      name?: string | null;
+      /** Avatar Url */
+      avatar_url?: string | null;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** External Id */
+      external_id: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+    };
+    /** ValidationError */
+    ValidationError: {
+      /** Location */
+      loc: (string | number)[];
+      /** Message */
+      msg: string;
+      /** Error Type */
+      type: string;
+    };
+    /** VectorDbCreate */
+    VectorDbCreate: {
+      /** Name */
+      name: string;
+      /**
+       * Db Type
+       * @enum {string}
+       */
+      db_type:
+        | 'postgres_pgvector'
+        | 'qdrant'
+        | 'milvus'
+        | 'weaviate'
+        | 'pinecone'
+        | 'chroma';
+      /**
+       * Is Active
+       * @default true
+       */
+      is_active: boolean;
+      /** Connection String */
+      connection_string: string;
+      /** Api Key */
+      api_key?: string | null;
+    };
+    /** VectorDbRead */
+    VectorDbRead: {
+      /** Name */
+      name: string;
+      /**
+       * Db Type
+       * @enum {string}
+       */
+      db_type:
+        | 'postgres_pgvector'
+        | 'qdrant'
+        | 'milvus'
+        | 'weaviate'
+        | 'pinecone'
+        | 'chroma';
+      /**
+       * Is Active
+       * @default true
+       */
+      is_active: boolean;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * User Id
+       * Format: uuid
+       */
+      user_id: string;
+      /** Connection String Mask */
+      connection_string_mask: string;
+      /** Api Key Mask */
+      api_key_mask?: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+    };
+    /** VectorDbTestResult */
+    VectorDbTestResult: {
+      /** Ok */
+      ok: boolean;
+      /** Latency Ms */
+      latency_ms: number;
+      /** Message */
+      message: string;
+    };
+    /** VectorDbUpdate */
+    VectorDbUpdate: {
+      /** Name */
+      name?: string | null;
+      /** Connection String */
+      connection_string?: string | null;
+      /** Api Key */
+      api_key?: string | null;
+      /** Is Active */
+      is_active?: boolean | null;
+    };
+  };
+  responses: never;
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    healthz_healthz_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-        };
+  healthz_healthz_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    readyz_readyz_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
+        content: {
+          'application/json': Record<string, never>;
         };
+      };
     };
-    get_me_api_v1_users_me_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  readyz_readyz_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    list_providers_api_v1_providers_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProviderRead"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          'application/json': Record<string, never>;
         };
+      };
     };
-    create_provider_api_v1_providers_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProviderCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProviderRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  get_me_api_v1_users_me_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path?: never;
+      cookie?: never;
     };
-    get_provider_api_v1_providers__provider_id__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                provider_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProviderRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['UserRead'];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
     };
-    update_provider_api_v1_providers__provider_id__put: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                provider_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProviderUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProviderRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  list_providers_api_v1_providers_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path?: never;
+      cookie?: never;
     };
-    delete_provider_api_v1_providers__provider_id__delete: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                provider_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['ProviderRead'][];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
     };
-    test_provider_api_v1_providers__provider_id__test_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                provider_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProviderTestResult"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  create_provider_api_v1_providers_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path?: never;
+      cookie?: never;
     };
-    list_models_api_v1_providers__provider_id__models_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                provider_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelRead"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ProviderCreate'];
+      };
     };
-    create_model_api_v1_providers__provider_id__models_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                provider_id: string;
-            };
-            cookie?: never;
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ModelCreate"];
-            };
+        content: {
+          'application/json': components['schemas']['ProviderRead'];
         };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
     };
-    list_available_models_api_v1_providers__provider_id__models_available_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                provider_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AvailableModel"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  get_provider_api_v1_providers__provider_id__get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        provider_id: string;
+      };
+      cookie?: never;
     };
-    get_model_api_v1_providers__provider_id__models__model_pk__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                provider_id: string;
-                model_pk: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['ProviderRead'];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
     };
-    update_model_api_v1_providers__provider_id__models__model_pk__put: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                provider_id: string;
-                model_pk: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ModelUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  update_provider_api_v1_providers__provider_id__put: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        provider_id: string;
+      };
+      cookie?: never;
     };
-    delete_model_api_v1_providers__provider_id__models__model_pk__delete: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                provider_id: string;
-                model_pk: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ProviderUpdate'];
+      };
     };
-    list_vector_dbs_api_v1_vector_dbs_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VectorDbRead"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['ProviderRead'];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
     };
-    create_vector_db_api_v1_vector_dbs_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VectorDbCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VectorDbRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  delete_provider_api_v1_providers__provider_id__delete: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        provider_id: string;
+      };
+      cookie?: never;
     };
-    get_vector_db_api_v1_vector_dbs__config_id__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                config_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VectorDbRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
     };
-    update_vector_db_api_v1_vector_dbs__config_id__put: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                config_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VectorDbUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VectorDbRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  test_provider_api_v1_providers__provider_id__test_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        provider_id: string;
+      };
+      cookie?: never;
     };
-    delete_vector_db_api_v1_vector_dbs__config_id__delete: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                config_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['ProviderTestResult'];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
     };
-    test_vector_db_api_v1_vector_dbs__config_id__test_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                config_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VectorDbTestResult"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  list_models_api_v1_providers__provider_id__models_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        provider_id: string;
+      };
+      cookie?: never;
     };
-    list_knowledge_bases_api_v1_knowledge_bases_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KnowledgeBaseRead"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['ModelRead'][];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
     };
-    create_knowledge_base_api_v1_knowledge_bases_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["KnowledgeBaseCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KnowledgeBaseRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  create_model_api_v1_providers__provider_id__models_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        provider_id: string;
+      };
+      cookie?: never;
     };
-    get_knowledge_base_api_v1_knowledge_bases__kb_id__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                kb_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KnowledgeBaseRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ModelCreate'];
+      };
     };
-    update_knowledge_base_api_v1_knowledge_bases__kb_id__put: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                kb_id: string;
-            };
-            cookie?: never;
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["KnowledgeBaseUpdate"];
-            };
+        content: {
+          'application/json': components['schemas']['ModelRead'];
         };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KnowledgeBaseRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
     };
-    delete_knowledge_base_api_v1_knowledge_bases__kb_id__delete: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                kb_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  list_available_models_api_v1_providers__provider_id__models_available_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        provider_id: string;
+      };
+      cookie?: never;
     };
-    list_documents_api_v1_knowledge_bases__kb_id__documents_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                kb_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DocumentRead"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['AvailableModel'][];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
     };
-    upload_document_api_v1_knowledge_bases__kb_id__documents_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                kb_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_upload_document_api_v1_knowledge_bases__kb_id__documents_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DocumentRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  get_model_api_v1_providers__provider_id__models__model_pk__get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        provider_id: string;
+        model_pk: string;
+      };
+      cookie?: never;
     };
-    delete_document_api_v1_knowledge_bases__kb_id__documents__doc_id__delete: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                kb_id: string;
-                doc_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['ModelRead'];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
     };
-    retrieve_api_v1_knowledge_bases__kb_id__retrieve_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                kb_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RetrieveRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RetrieveResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  update_model_api_v1_providers__provider_id__models__model_pk__put: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        provider_id: string;
+        model_pk: string;
+      };
+      cookie?: never;
     };
-    rebuild_api_v1_knowledge_bases__kb_id__rebuild_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-User-Id"?: string | null;
-                "X-User-Email"?: string | null;
-                "X-User-Name"?: string | null;
-            };
-            path: {
-                kb_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": components["schemas"]["RebuildRequest"] | null;
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ModelUpdate'];
+      };
     };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ModelRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  delete_model_api_v1_providers__provider_id__models__model_pk__delete: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        provider_id: string;
+        model_pk: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  probe_embedding_dimension_api_v1_providers__provider_id__models_dimension_probe_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        provider_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EmbeddingDimensionProbeRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EmbeddingDimensionProbeResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_vector_dbs_api_v1_vector_dbs_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VectorDbRead'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  create_vector_db_api_v1_vector_dbs_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['VectorDbCreate'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VectorDbRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_vector_db_api_v1_vector_dbs__config_id__get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VectorDbRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  update_vector_db_api_v1_vector_dbs__config_id__put: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['VectorDbUpdate'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VectorDbRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  delete_vector_db_api_v1_vector_dbs__config_id__delete: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  test_vector_db_api_v1_vector_dbs__config_id__test_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VectorDbTestResult'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_notifications_api_v1_notifications_get: {
+    parameters: {
+      query?: {
+        page?: number;
+        page_size?: number;
+        unread_only?: boolean;
+      };
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationListResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  unread_count_api_v1_notifications_unread_count_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UnreadCountResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  mark_read_api_v1_notifications_mark_read_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MarkReadRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MarkReadResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_knowledge_bases_api_v1_knowledge_bases_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KnowledgeBaseRead'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  create_knowledge_base_api_v1_knowledge_bases_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['KnowledgeBaseCreate'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KnowledgeBaseRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_knowledge_base_api_v1_knowledge_bases__kb_id__get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        kb_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KnowledgeBaseRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  update_knowledge_base_api_v1_knowledge_bases__kb_id__put: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        kb_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['KnowledgeBaseUpdate'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KnowledgeBaseRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  delete_knowledge_base_api_v1_knowledge_bases__kb_id__delete: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        kb_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_documents_api_v1_knowledge_bases__kb_id__documents_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        kb_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DocumentRead'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  upload_document_api_v1_knowledge_bases__kb_id__documents_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        kb_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Body_upload_document_api_v1_knowledge_bases__kb_id__documents_post'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DocumentRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  upload_documents_api_v1_knowledge_bases__kb_id__documents_batch_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        kb_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Body_upload_documents_api_v1_knowledge_bases__kb_id__documents_batch_post'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BatchUploadResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  delete_document_api_v1_knowledge_bases__kb_id__documents__doc_id__delete: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        kb_id: string;
+        doc_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_latest_ingestion_job_api_v1_knowledge_bases__kb_id__documents__doc_id__ingestion_job_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        kb_id: string;
+        doc_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IngestionJobRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_document_chunks_api_v1_knowledge_bases__kb_id__documents__doc_id__chunks_get: {
+    parameters: {
+      query?: {
+        page?: number;
+        page_size?: number;
+        include_text?: boolean;
+      };
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        kb_id: string;
+        doc_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DocumentChunksResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  retry_latest_ingestion_job_api_v1_knowledge_bases__kb_id__documents__doc_id__ingestion_job_retry_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        kb_id: string;
+        doc_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['IngestionJobRead'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  retrieve_api_v1_knowledge_bases__kb_id__retrieve_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        kb_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RetrieveRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RetrieveResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  rebuild_api_v1_knowledge_bases__kb_id__rebuild_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        'X-User-Id'?: string | null;
+        'X-User-Email'?: string | null;
+        'X-User-Name'?: string | null;
+      };
+      path: {
+        kb_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['RebuildRequest'] | null;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
 }
+

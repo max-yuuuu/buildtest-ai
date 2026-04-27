@@ -33,6 +33,12 @@ _AZURE_API_VERSION = "2024-02-01"
 def _strip_slash(url: str) -> str:
     return url.rstrip("/")
 
+def _strip_ollama_v1(url: str) -> str:
+    u = _strip_slash(url)
+    if u.endswith("/v1"):
+        return u[: -len("/v1")]
+    return u
+
 
 async def list_models(
     provider_type: str,
@@ -54,6 +60,10 @@ async def list_models(
                 "config", f"base_url is required for {provider_type} (OpenAI-compatible endpoint)"
             )
         return await _openai(api_key, base_url)
+    if provider_type == "ollama":
+        if not base_url:
+            raise ProbeError("config", "base_url is required for ollama provider")
+        return await _ollama(base_url)
     raise ProbeError("config", f"unsupported provider_type: {provider_type}")
 
 
@@ -81,14 +91,26 @@ def _raise_for_status(resp: httpx.Response) -> None:
         )
 
 
-async def _openai(api_key: str, base_url: str) -> list[str]:
+async def _openai(api_key: str | None, base_url: str) -> list[str]:
+    headers: dict[str, str] = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     resp = await _get(
         f"{_strip_slash(base_url)}/models",
-        headers={"Authorization": f"Bearer {api_key}"},
+        headers=headers,
     )
     _raise_for_status(resp)
     data = resp.json().get("data", [])
     return [item["id"] for item in data if "id" in item]
+
+async def _ollama(base_url: str) -> list[str]:
+    resp = await _get(
+        f"{_strip_ollama_v1(base_url)}/api/tags",
+        headers={},
+    )
+    _raise_for_status(resp)
+    data = resp.json().get("models", [])
+    return [m["name"] for m in data if isinstance(m, dict) and "name" in m]
 
 
 async def _anthropic(api_key: str, base_url: str) -> list[str]:
