@@ -24,6 +24,7 @@ class Settings(BaseSettings):
 
     http_probe_timeout: float = 10.0
     kb_ingestion_notification_timeout_seconds: int = 600
+    kb_batch_max_concurrency: int = 3
 
 
 settings = Settings()

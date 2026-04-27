@@ -170,6 +170,11 @@ export interface KbDocument {
   ingestion_attempt_count?: number | null;
 }
 
+export interface BatchUploadResponse {
+  created_count: number;
+  documents: KbDocument[];
+}
+
 export interface RetrieveInput {
   query: string;
   top_k?: number;

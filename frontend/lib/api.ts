@@ -1,5 +1,6 @@
 import type {
   AvailableModel,
+  BatchUploadResponse,
   KnowledgeBase,
   KnowledgeBaseCreateInput,
   KnowledgeBaseUpdateInput,
@@ -149,6 +150,28 @@ export const knowledgeBaseApi = {
       throw new Error(detail);
     }
     return res.json() as Promise<KbDocument>;
+  },
+  uploadDocuments: async (
+    kbId: string,
+    files: File[],
+  ): Promise<BatchUploadResponse> => {
+    const fd = new FormData();
+    files.forEach((f) => fd.append("files", f));
+    const res = await fetch(`${BASE}/knowledge-bases/${kbId}/documents/batch`, {
+      method: "POST",
+      body: fd,
+    });
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        detail = body.detail ?? detail;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(detail);
+    }
+    return res.json() as Promise<BatchUploadResponse>;
   },
   retrieve: (kbId: string, data: RetrieveInput) =>
     request<RetrieveResponse>(`/knowledge-bases/${kbId}/retrieve`, {

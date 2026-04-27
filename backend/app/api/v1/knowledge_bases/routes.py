@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user_id, get_session
 from app.schemas.knowledge_base import (
+    BatchUploadResponse,
     DocumentChunksResponse,
     DocumentRead,
     IngestionJobRead,
@@ -86,6 +87,20 @@ async def upload_document(
     session: AsyncSession = Depends(get_session),
 ) -> DocumentRead:
     return await _svc(session, user_id).upload_document(kb_id, file)
+
+
+@router.post(
+    "/{kb_id}/documents/batch",
+    response_model=BatchUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_documents(
+    kb_id: uuid.UUID,
+    files: list[UploadFile] = File(...),
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> BatchUploadResponse:
+    return await _svc(session, user_id).upload_documents(kb_id, files)
 
 
 @router.delete("/{kb_id}/documents/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)

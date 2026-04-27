@@ -25,6 +25,7 @@ from app.repositories.model import ModelRepository
 from app.repositories.provider import ProviderRepository
 from app.repositories.vector_db_config import VectorDbConfigRepository
 from app.schemas.knowledge_base import (
+    BatchUploadResponse,
     DocumentChunkDocumentRead,
     DocumentChunkPaginationRead,
     DocumentChunkRead,
@@ -283,6 +284,67 @@ class KnowledgeBaseService:
             str(job.id),
         )
         return await self._to_doc_read(doc)
+
+    async def upload_documents(
+        self, kb_id: uuid.UUID, files: list[UploadFile]
+    ) -> BatchUploadResponse:
+        kb = await self._require_kb(kb_id)
+        if not files:
+            raise HTTPException(status_code=422, detail="未提供文件")
+
+        max_b = settings.upload_max_size_mb * 1024 * 1024
+        doc_ids: list[uuid.UUID] = []
+        job_ids: list[uuid.UUID] = []
+
+        for file in files:
+            raw_name = file.filename or "upload.bin"
+            safe_name = os.path.basename(raw_name)
+            if not safe_name or safe_name in (".", ".."):
+                raise HTTPException(status_code=422, detail=f"无效文件名: {raw_name}")
+            data = await file.read()
+            if len(data) > max_b:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"文件「{safe_name}」超过 {settings.upload_max_size_mb}MB 限制",
+                )
+            ext = safe_name.rsplit(".", 1)[-1].lower() if "." in safe_name else ""
+            doc = Document(
+                knowledge_base_id=kb_id,
+                file_name=safe_name,
+                file_type=ext or None,
+                file_size=len(data),
+                status="queued",
+            )
+            await self.doc_repo.create(doc)
+            await self.session.flush()
+            base = Path(settings.upload_dir) / str(kb_id) / str(doc.id)
+            base.mkdir(parents=True, exist_ok=True)
+            dest = base / safe_name
+            dest.write_bytes(data)
+            rel = str(dest.relative_to(Path(settings.upload_dir)))
+            doc.storage_path = rel
+            job = await self.ingestion_job_service.create_job(kb.id, doc.id)
+            doc_ids.append(doc.id)
+            job_ids.append(job.id)
+
+        await self.session.commit()
+
+        # Refresh all documents to get updated fields
+        docs = await self.doc_repo.list_for_kb(kb_id)
+        uploaded = [d for d in docs if d.id in doc_ids]
+        doc_reads: list[DocumentRead] = []
+        for d in uploaded:
+            doc_reads.append(await self._to_doc_read(d))
+
+        from app.tasks.ingestion import process_batch_ingestion_task
+
+        process_batch_ingestion_task.delay(
+            str(self.user_id),
+            str(kb.id),
+            [str(did) for did in doc_ids],
+            [str(jid) for jid in job_ids],
+        )
+        return BatchUploadResponse(created_count=len(doc_reads), documents=doc_reads)
 
     async def get_latest_ingestion_job(
         self, kb_id: uuid.UUID, doc_id: uuid.UUID

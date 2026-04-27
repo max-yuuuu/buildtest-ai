@@ -2,6 +2,7 @@ import asyncio
 import uuid
 
 from app.core.celery_app import celery_app
+from app.core.config import settings
 from app.core.database import async_session_maker
 from app.services.knowledge_base_service import KnowledgeBaseService
 
@@ -39,3 +40,26 @@ def process_document_ingestion_task(
     job_id: str,
 ) -> None:
     _run_async(_run_ingestion(user_id=user_id, kb_id=kb_id, doc_id=doc_id, job_id=job_id))
+
+
+@celery_app.task(name="app.tasks.ingestion.process_batch_ingestion_task")
+def process_batch_ingestion_task(
+    user_id: str,
+    kb_id: str,
+    doc_ids: list[str],
+    job_ids: list[str],
+) -> None:
+    async def _run_batch() -> None:
+        sem = asyncio.Semaphore(settings.kb_batch_max_concurrency)
+
+        async def _with_semaphore(doc_id: str, job_id: str) -> None:
+            async with sem:
+                await _run_ingestion(
+                    user_id=user_id, kb_id=kb_id, doc_id=doc_id, job_id=job_id
+                )
+
+        await asyncio.gather(
+            *[_with_semaphore(did, jid) for did, jid in zip(doc_ids, job_ids, strict=True)]
+        )
+
+    _run_async(_run_batch())

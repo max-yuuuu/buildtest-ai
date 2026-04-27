@@ -124,12 +124,12 @@ export default function KnowledgeBaseDetailPage() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: (file: File) => knowledgeBaseApi.uploadDocument(id, file),
-    onSuccess: () => {
+    mutationFn: (files: File[]) => knowledgeBaseApi.uploadDocuments(id, files),
+    onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["knowledge-bases", id, "documents"] });
       qc.invalidateQueries({ queryKey: ["knowledge-bases", id] });
       qc.invalidateQueries({ queryKey: ["knowledge-bases"] });
-      toast.success("上传成功，文档已进入入库队列");
+      toast.success(`${res.created_count} 个文件上传成功，文档已进入入库队列`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -178,8 +178,8 @@ export default function KnowledgeBaseDetailPage() {
 
   const triggerUpload = () => fileInputRef.current?.click();
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (f) uploadMutation.mutate(f);
+    const files = e.target.files;
+    if (files && files.length > 0) uploadMutation.mutate(Array.from(files));
     e.target.value = "";
   };
 
@@ -227,6 +227,7 @@ export default function KnowledgeBaseDetailPage() {
           ref={fileInputRef}
           type="file"
           hidden
+          multiple
           onChange={handleFileChange}
           accept=".txt,.md,.pdf,.doc,.docx"
         />

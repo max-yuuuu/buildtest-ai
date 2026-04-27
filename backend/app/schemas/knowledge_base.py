@@ -155,3 +155,8 @@ class RetrieveResponse(BaseModel):
 
 class RebuildRequest(BaseModel):
     document_id: uuid.UUID | None = None
+
+
+class BatchUploadResponse(BaseModel):
+    created_count: int
+    documents: list[DocumentRead]
