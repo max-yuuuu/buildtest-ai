@@ -168,13 +168,21 @@ class ModelService:
                 if extra not in upstream:
                     upstream.append(extra)
 
+        # 上游可能返回重复 model_id,去重后返回
+        seen = set()
+        deduped = []
+        for mid in upstream:
+            if mid not in seen:
+                seen.add(mid)
+                deduped.append(mid)
+
         return [
             AvailableModel(
                 model_id=mid,
                 suggested_type=_infer_model_type(mid),
                 is_registered=mid in registered,
             )
-            for mid in upstream
+            for mid in deduped
         ]
 
     async def probe_embedding_dimension(
