@@ -13,6 +13,7 @@ import {
   FlaskConical,
   FileText,
   MessageSquareText,
+  MessageCircle,
   Boxes,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,7 @@ const navGroups: NavGroup[] = [
   {
     label: "构建",
     items: [
+      { href: "/chat", label: "Quick Chat", icon: MessageCircle },
       { href: "/prompts", label: "Prompt", icon: MessageSquareText, soon: true },
       { href: "/agents", label: "Agent", icon: Sparkles, soon: true },
     ],

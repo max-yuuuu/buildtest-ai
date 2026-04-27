@@ -14,6 +14,7 @@
     "gen:api-types": "openapi-typescript http://localhost:8000/openapi.json -o lib/api-types.ts"
   },
   "dependencies": {
+    "@ai-sdk/react": "^1.2.11",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-alert-dialog": "^1.1.2",
     "@radix-ui/react-avatar": "^1.1.1",

@@ -47,3 +47,5 @@ tmp/
 playwright-report/
 test-results/
 .pnpm-store/
+
+.venv312
