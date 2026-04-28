@@ -30,7 +30,7 @@ import type { AvailableModel, Model, ModelType } from "@/lib/types";
 const schema = z
   .object({
     model_id: z.string().min(1),
-    model_type: z.enum(["llm", "embedding"] as const),
+    model_type: z.enum(["llm", "embedding", "ocr"] as const),
     context_window: z
       .string()
       .optional()
@@ -208,7 +208,7 @@ export function RegisterModelDialog({
             ) : (
               "把上游模型登记到本地,知识库 / 评测任务才能绑定。"
             )}{" "}
-            embedding 模型会自动探测向量维度并复用;单次向量化条数可填{" "}
+            embedding 模型会自动探测向量维度并复用;OCR 模型用于文档入库识别。单次向量化条数可填{" "}
             <span className="font-mono">embedding_batch_size</span>
             (可选,1–2048,留空用默认)。
           </DialogDescription>
@@ -251,6 +251,7 @@ export function RegisterModelDialog({
               <SelectContent>
                 <SelectItem value="llm">llm（对话 / 生成）</SelectItem>
                 <SelectItem value="embedding">embedding（向量化）</SelectItem>
+                <SelectItem value="ocr">ocr（识别）</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -269,7 +270,7 @@ export function RegisterModelDialog({
                 {...form.register("context_window")}
               />
             </div>
-          ) : (
+          ) : modelType === "embedding" ? (
             <>
               <div className="space-y-1">
                 <Label htmlFor="vector_dimension">
@@ -326,6 +327,10 @@ export function RegisterModelDialog({
                 )}
               </div>
             </>
+          ) : (
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              OCR 模型无需 `vector_dimension` 与 `embedding_batch_size`，登记后可在知识库配置中用于多模态入库。
+            </div>
           )}
 
           <DialogFooter>

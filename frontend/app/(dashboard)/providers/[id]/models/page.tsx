@@ -110,10 +110,11 @@ export default function ProviderModelsPage() {
 
   const typeCounts = useMemo(() => {
     const list = availableQ.data ?? [];
-    const c = { all: list.length, llm: 0, embedding: 0, unknown: 0 };
+    const c = { all: list.length, llm: 0, embedding: 0, ocr: 0, unknown: 0 };
     for (const m of list) {
       if (m.suggested_type === "llm") c.llm += 1;
       else if (m.suggested_type === "embedding") c.embedding += 1;
+      else if (m.suggested_type === "ocr") c.ocr += 1;
       else c.unknown += 1;
     }
     return c;
@@ -220,6 +221,12 @@ export default function ProviderModelsPage() {
                 onClick={() => setTypeFilter("embedding")}
                 label="embedding"
                 count={typeCounts.embedding}
+              />
+              <FilterChip
+                active={typeFilter === "ocr"}
+                onClick={() => setTypeFilter("ocr")}
+                label="ocr"
+                count={typeCounts.ocr}
               />
               <FilterChip
                 active={typeFilter === "unknown"}
@@ -492,6 +499,7 @@ function TypeBadge({ type, dim }: { type: ModelType; dim?: boolean }) {
   const map = {
     llm: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
     embedding: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
+    ocr: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
   };
   return (
     <Badge

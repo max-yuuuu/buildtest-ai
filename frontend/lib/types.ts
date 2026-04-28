@@ -34,7 +34,7 @@ export interface ProviderTestResult {
   models: string[];
 }
 
-export type ModelType = "llm" | "embedding";
+export type ModelType = "llm" | "embedding" | "ocr";
 
 export interface Model {
   id: string;
@@ -142,6 +142,7 @@ export interface KnowledgeBaseCreateInput {
   chunk_overlap?: number;
   retrieval_top_k?: number;
   retrieval_similarity_threshold?: number;
+  retrieval_config?: Record<string, unknown>;
 }
 
 export interface KnowledgeBaseUpdateInput {
@@ -152,6 +153,7 @@ export interface KnowledgeBaseUpdateInput {
   chunk_overlap?: number;
   retrieval_top_k?: number;
   retrieval_similarity_threshold?: number;
+  retrieval_config?: Record<string, unknown>;
 }
 
 export interface KbDocument {
