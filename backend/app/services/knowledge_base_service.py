@@ -1,19 +1,24 @@
 from __future__ import annotations
 
 import hashlib
+import io
+import json
 import logging
 import mimetypes
 import os
-import string
 import shutil
+import string
 import time
+import time as time_module
 import uuid
 from dataclasses import dataclass
 from math import ceil
 from pathlib import Path
+from threading import Lock
 
 from fastapi import HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from PIL import Image
 from sqlalchemy import func, select
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +28,7 @@ from app.models.document import Document
 from app.models.kb_vector_chunk import KbVectorChunk
 from app.models.knowledge_base import KnowledgeBase
 from app.models.model import Model
+from app.models.provider import Provider
 from app.models.vector_db_config import VectorDbConfig
 from app.repositories.document import DocumentRepository
 from app.repositories.knowledge_base import KnowledgeBaseRepository
@@ -30,8 +36,8 @@ from app.repositories.model import ModelRepository
 from app.repositories.provider import ProviderRepository
 from app.repositories.vector_db_config import VectorDbConfigRepository
 from app.schemas.knowledge_base import (
-    BBoxNorm,
     BatchUploadResponse,
+    BBoxNorm,
     DocumentChunkDocumentRead,
     DocumentChunkPaginationRead,
     DocumentChunkRead,
@@ -50,8 +56,9 @@ from app.schemas.knowledge_base import (
     SourceMetadata,
     SourceOrigin,
 )
-from app.services import embedding_client
+from app.services import embedding_client, ocr_client
 from app.services.document_loaders import (
+    convert_office_to_pdf,
     detect_input_kind,
     extract_segments,
     infer_normalization_mode,
@@ -100,6 +107,9 @@ def _normalize_retrieval_config(retrieval_config: dict | None) -> dict:
 
 MAX_REPLAY_ASSET_BYTES = 20 * 1024 * 1024
 MAX_FALLBACK_TEXT_CHARS = 2000
+REPLAY_ASSET_RPS = 5
+_replay_access_lock = Lock()
+_replay_access_tracker: dict[str, tuple[int, float]] = {}
 
 
 @dataclass
@@ -113,6 +123,9 @@ class ParsedBlock:
     bbox_norm: dict[str, float] | None = None
     page_image_path: str | None = None
     crop_image_path: str | None = None
+    context_text: str | None = None
+    ocr_lines: list[dict] | None = None
+    ocr_words: list[dict] | None = None
 
 
 def _build_source_generator(
@@ -126,8 +139,11 @@ def _build_source_generator(
         generator.capability = "ocr"
         ocr_model_id = (config_snapshot or {}).get("ocr_model_id")
         if ocr_model_id:
-            generator.model_id = ocr_model_id
-    payload = generator.model_dump(exclude_none=True)
+            try:
+                generator.model_id = uuid.UUID(str(ocr_model_id))
+            except ValueError:
+                generator.model_id = None
+    payload = generator.model_dump(mode="json", exclude_none=True)
     return payload or None
 
 
@@ -171,9 +187,55 @@ def _build_source_metadata(
                 "block_id": block.block_id,
                 "asset_id": asset_id,
             },
+            "ocr": {
+                "lines": (block.ocr_lines or [])[:100],
+                "words": (block.ocr_words or [])[:200],
+            },
+            "surrounding_text": block.context_text,
         },
     )
-    return metadata.model_dump(exclude_none=True)
+    # Use JSON mode to ensure UUID/datetime are JSON-serializable for JSON columns.
+    return metadata.model_dump(mode="json", exclude_none=True)
+
+
+def _normalize_source_metadata(payload: dict | None) -> dict:
+    if not payload:
+        return {}
+    return SourceMetadata.model_validate(payload).model_dump(mode="json", exclude_none=True)
+
+
+def _sanitize_error_message(raw: str) -> str:
+    sanitized = raw.replace(str(Path(settings.upload_dir).resolve()), "[UPLOAD_DIR]")
+    return sanitized[:2000]
+
+
+def _friendly_ingestion_error_message(exc: Exception) -> str:
+    raw = str(exc)
+    lower = raw.lower()
+
+    if "object of type uuid is not json serializable" in lower:
+        return (
+            "文档入库失败：系统内部元数据序列化错误（UUID 无法写入 JSON）。"
+            "请重试；若持续出现，请升级后端到最新版本或联系管理员。"
+        )
+
+    if "vector dimension" in lower or "维度" in raw:
+        return (
+            "文档入库失败：embedding 向量维度不一致。"
+            "请检查知识库绑定的 embedding 模型维度配置是否与上游实际输出一致。"
+        )
+
+    if "ocr provider" in lower or ("ocr" in lower and "not available" in lower):
+        return (
+            "文档入库失败：OCR provider/model 不可用，"
+            "请检查 provider 是否启用与 base_url/api_key 配置。"
+        )
+
+    # Default: keep it short and readable; full details stay in server logs.
+    brief = _sanitize_error_message(raw)
+    if len(brief) > 300:
+        brief = brief[:300] + "..."
+    return f"文档入库失败：{brief}"
 
 
 def _doc_root_dir(kb_id: uuid.UUID, doc_id: uuid.UUID) -> Path:
@@ -202,9 +264,7 @@ def _doc_cache_dir(kb_id: uuid.UUID, doc_id: uuid.UUID) -> Path:
 
 def _strip_unsafe_text_chars(text: str) -> str:
     allowed_controls = {"\n", "\r", "\t"}
-    cleaned = "".join(
-        ch for ch in text if ch in allowed_controls or (ch >= " " and ch != "\x7f")
-    )
+    cleaned = "".join(ch for ch in text if ch in allowed_controls or (ch >= " " and ch != "\x7f"))
     return cleaned.replace("\x00", "")
 
 
@@ -214,11 +274,7 @@ def _looks_binary_bytes(data: bytes) -> bool:
     sample = data[:4096]
     if b"\x00" in sample:
         return True
-    textish = sum(
-        1
-        for b in sample
-        if chr(b) in string.printable or b >= 0x80
-    )
+    textish = sum(1 for b in sample if chr(b) in string.printable or b >= 0x80)
     return (textish / len(sample)) < 0.85
 
 
@@ -234,6 +290,25 @@ def _build_safe_fallback_text(file_name: str, file_bytes: bytes, input_kind: str
     if not cleaned:
         return f"[OCR_FALLBACK_PENDING] {file_name}"
     return cleaned[:MAX_FALLBACK_TEXT_CHARS]
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def _bbox_from_pdf_obj(
+    *, x0: float, y0: float, x1: float, y1: float, width: float, height: float
+) -> dict[str, float]:
+    safe_w = max(1.0, float(width))
+    safe_h = max(1.0, float(height))
+    top = safe_h - float(y1)
+    bottom = safe_h - float(y0)
+    return {
+        "x0": _clamp01(float(x0) / safe_w),
+        "y0": _clamp01(top / safe_h),
+        "x1": _clamp01(float(x1) / safe_w),
+        "y1": _clamp01(bottom / safe_h),
+    }
 
 
 class KnowledgeBaseService:
@@ -460,11 +535,13 @@ class KnowledgeBaseService:
         rel_path = Path(raw_asset_path)
         if rel_path.is_absolute() or ".." in rel_path.parts:
             raise HTTPException(status_code=422, detail="asset_path 非法")
-        allowed_prefixes = {
+        allowed_prefixes: set[Path] = {
             Path("derived/pages"),
             Path("derived/crops"),
         }
-        if not any(rel_path.parts[: len(prefix.parts)] == prefix.parts for prefix in allowed_prefixes):
+        if not any(
+            rel_path.parts[: len(prefix.parts)] == prefix.parts for prefix in allowed_prefixes
+        ):
             raise HTTPException(status_code=422, detail="仅允许访问 derived/pages 或 derived/crops")
         root_dir = _doc_root_dir(kb_id, doc_id).resolve()
         resolved = (root_dir / rel_path).resolve()
@@ -474,80 +551,413 @@ class KnowledgeBaseService:
             raise HTTPException(status_code=422, detail="asset_path 超出文档目录") from exc
         return resolved
 
+    def _check_replay_rate_limit(self, kb_id: uuid.UUID, doc_id: uuid.UUID) -> None:
+        key = f"{self.user_id}:{kb_id}:{doc_id}"
+        now = time_module.monotonic()
+        with _replay_access_lock:
+            count, window_start = _replay_access_tracker.get(key, (0, now))
+            if now - window_start >= 1.0:
+                count = 0
+                window_start = now
+            count += 1
+            _replay_access_tracker[key] = (count, window_start)
+        if count > REPLAY_ASSET_RPS:
+            raise HTTPException(status_code=429, detail="replay asset request rate limited")
+
+    def _cache_key(self, file_bytes: bytes, config_snapshot: dict) -> str:
+        payload = json.dumps(config_snapshot, ensure_ascii=True, sort_keys=True)
+        return hashlib.sha256(file_bytes + payload.encode("utf-8")).hexdigest()
+
+    def _page_asset_rel_path(self, page: int) -> str:
+        return f"derived/pages/page-{page:04d}.png"
+
+    def _crop_asset_rel_path(self, block_id: str) -> str:
+        return f"derived/crops/{block_id}.png"
+
+    def _render_page_image(
+        self, *, kb_id: uuid.UUID, doc_id: uuid.UUID, page: int, source_bytes: bytes
+    ) -> str:
+        rel = self._page_asset_rel_path(page)
+        out = _doc_root_dir(kb_id, doc_id) / rel
+        out.parent.mkdir(parents=True, exist_ok=True)
+        if not out.exists():
+            with Image.open(io.BytesIO(source_bytes)) as img:
+                img.convert("RGB").save(out, format="PNG")
+        return rel
+
+    def _crop_from_page(
+        self,
+        *,
+        kb_id: uuid.UUID,
+        doc_id: uuid.UUID,
+        page_image_path: str,
+        block_id: str,
+        bbox_norm: dict[str, float] | None,
+    ) -> str | None:
+        if not bbox_norm:
+            return None
+        rel = self._crop_asset_rel_path(block_id)
+        out = _doc_root_dir(kb_id, doc_id) / rel
+        out.parent.mkdir(parents=True, exist_ok=True)
+        if out.exists():
+            return rel
+        page_path = _doc_root_dir(kb_id, doc_id) / page_image_path
+        if not page_path.exists():
+            return None
+        with Image.open(page_path) as img:
+            w, h = img.size
+            x0 = max(0, min(w, int(_clamp01(bbox_norm["x0"]) * w)))
+            y0 = max(0, min(h, int(_clamp01(bbox_norm["y0"]) * h)))
+            x1 = max(x0 + 1, min(w, int(_clamp01(bbox_norm["x1"]) * w)))
+            y1 = max(y0 + 1, min(h, int(_clamp01(bbox_norm["y1"]) * h)))
+            img.crop((x0, y0, x1, y1)).save(out, format="PNG")
+        return rel
+
+    def _build_multimodal_chunk_text(self, block: ParsedBlock) -> str:
+        if block.block_type == "text":
+            return block.text
+        lines = [f"[{block.block_type.upper()} BLOCK]"]
+        if block.context_text:
+            lines.append(f"Context: {block.context_text}")
+        lines.append(f"OCR: {block.text.strip() or '[EMPTY]'}")
+        return "\n".join(lines)
+
+    async def _resolve_ocr_runtime(
+        self, retrieval_config: dict | None
+    ) -> tuple[Model | None, Provider | None, list[str]]:
+        cfg = _multimodal_ingestion_config(retrieval_config)
+        raw_languages = cfg.get("languages") or []
+        languages = [str(item) for item in raw_languages if str(item).strip()] or ["zh", "en"]
+        ocr_model_id = cfg.get("ocr_model_id")
+        if not ocr_model_id:
+            return None, None, languages
+        model = await self._get_ocr_model(uuid.UUID(str(ocr_model_id)))
+        provider = await self.provider_repo.get(model.provider_id)
+        if provider is None or not provider.is_active:
+            raise HTTPException(status_code=422, detail="OCR provider 不可用")
+        return model, provider, languages
+
+    async def _enrich_blocks_with_ocr(
+        self,
+        *,
+        kb: KnowledgeBase,
+        doc: Document,
+        blocks: list[ParsedBlock],
+    ) -> tuple[list[ParsedBlock], str]:
+        model, provider, languages = await self._resolve_ocr_runtime(kb.retrieval_config)
+        if model is None or provider is None:
+            return blocks, "ocr_disabled"
+        hard_failed = False
+        ok_logs_left = 3
+        for block in blocks:
+            if hard_failed:
+                break
+            should_ocr = block.block_type in {"image", "table", "equation"} or block.modality in {
+                "ocr_fallback_pending"
+            }
+            if not should_ocr:
+                continue
+            image_rel = block.crop_image_path or block.page_image_path
+            if not image_rel:
+                continue
+            image_abs = _doc_root_dir(kb.id, doc.id) / image_rel
+            if not image_abs.exists():
+                continue
+            try:
+                image_bytes = image_abs.read_bytes()
+                cache_key = hashlib.sha256(
+                    (model.model_id + "|" + ",".join(languages)).encode("utf-8")
+                    + b"|"
+                    + image_rel.encode("utf-8")
+                    + b"|"
+                    + image_bytes
+                ).hexdigest()
+                cache_path = _doc_cache_dir(kb.id, doc.id) / f"ocr-{cache_key}.json"
+                if cache_path.exists():
+                    cached = json.loads(cache_path.read_text(encoding="utf-8"))
+                    cached_text = str(cached.get("text") or "").strip()
+                    if cached_text:
+                        block.text = cached_text
+                        block.modality = "ocr_text"
+                    block.generator_impl = str(cached.get("generator_impl") or "ocr.cache")
+                    block.ocr_lines = (
+                        cached.get("lines") if isinstance(cached.get("lines"), list) else []
+                    )
+                    block.ocr_words = (
+                        cached.get("words") if isinstance(cached.get("words"), list) else []
+                    )
+                    continue
+
+                ocr = await ocr_client.extract_text_from_image(
+                    provider_type=provider.provider_type,
+                    api_key=provider.api_key_encrypted,
+                    base_url=provider.base_url,
+                    model_id=model.model_id,
+                    image_bytes=image_bytes,
+                    languages=languages,
+                )
+                if ocr.text.strip():
+                    block.text = ocr.text.strip()
+                    block.modality = "ocr_text"
+                block.generator_impl = ocr.provider_impl
+                block.ocr_lines = ocr.lines
+                block.ocr_words = ocr.words
+
+                cache_path.write_text(
+                    json.dumps(
+                        {
+                            "text": block.text,
+                            "lines": block.ocr_lines or [],
+                            "words": block.ocr_words or [],
+                            "generator_impl": block.generator_impl,
+                        },
+                        ensure_ascii=True,
+                    ),
+                    encoding="utf-8",
+                )
+
+                # Keep logs bounded; enough to confirm "200 OK but empty content" vs success.
+                if ok_logs_left > 0:
+                    ok_logs_left -= 1
+                    logger.info(
+                        "ocr_enrichment_ok",
+                        extra={
+                            "kb_id": str(kb.id),
+                            "doc_id": str(doc.id),
+                            "block_id": block.block_id,
+                            "image_rel": image_rel,
+                            "text_len": len(block.text or ""),
+                            "generator_impl": block.generator_impl,
+                        },
+                    )
+            except Exception as exc:
+                msg = str(exc)
+                logger.warning("ocr_enrichment_failed", extra={"error": msg[:300]})
+                # If endpoint is wrong (404), stop retrying for each block to reduce noise/cost.
+                if "HTTP 404" in msg:
+                    hard_failed = True
+                    return blocks, "ocr_endpoint_not_found"
+        return blocks, "ocr_model_applied"
+
     def _build_blocks_from_segments(
-        self, *, file_name: str, file_bytes: bytes, retrieval_config: dict | None = None
+        self,
+        *,
+        kb_id: uuid.UUID,
+        doc_id: uuid.UUID,
+        file_name: str,
+        file_bytes: bytes,
+        retrieval_config: dict | None = None,
     ) -> tuple[list[ParsedBlock], dict]:
         input_kind = detect_input_kind(file_name)
         normalization_mode = infer_normalization_mode(file_name)
         multimodal_config = _multimodal_ingestion_config(retrieval_config)
-        segments = extract_segments(file_name=file_name, data=file_bytes)
-        if segments:
-            blocks = [
-                ParsedBlock(
-                    block_id=f"blk-{idx}",
-                    block_type="text",
-                    page=seg.page or 1,
-                    text=seg.text,
-                    modality="text",
-                    generator_impl="extract_segments",
-                    bbox_norm={"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0},
-                )
-                for idx, seg in enumerate(segments)
-                if seg.text and seg.text.strip()
-            ]
-            return blocks, {
-                "mode": "txt",
-                "reason": "text_layer_available",
-                "input_kind": input_kind,
-                "normalization_mode": normalization_mode,
-                "normalized_to": "blocks",
-                "config_snapshot": multimodal_config,
-            }
+        cache_key = self._cache_key(file_bytes, multimodal_config)
+        cache_path = _doc_cache_dir(kb_id, doc_id) / f"parse-{cache_key}.json"
+        if cache_path.exists():
+            cached = json.loads(cache_path.read_text(encoding="utf-8"))
+            blocks = [ParsedBlock(**item) for item in cached["blocks"]]
+            return blocks, cached["trace"]
 
-        if input_kind == "image":
+        parse_mode = str(multimodal_config.get("parse_mode") or "auto")
+        blocks: list[ParsedBlock] = []
+        used_mode = "txt"
+        reason = "text_layer_available"
+        try:
+            if input_kind == "office":
+                office_segments = extract_segments(file_name=file_name, data=file_bytes)
+                blocks = [
+                    ParsedBlock(
+                        block_id=f"blk-{idx}",
+                        block_type="text",
+                        page=seg.page or 1,
+                        text=seg.text,
+                        modality="text",
+                        generator_impl="extract_segments",
+                        bbox_norm={"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0},
+                    )
+                    for idx, seg in enumerate(office_segments)
+                    if seg.text and seg.text.strip()
+                ]
+                needs_office_pdf_fallback = parse_mode == "ocr" or not blocks
+                if needs_office_pdf_fallback:
+                    office_ext = file_name.rsplit(".", 1)[-1].lower()
+                    file_bytes = convert_office_to_pdf(data=file_bytes, suffix=office_ext)
+                    input_kind = "pdf"
+                    normalization_mode = "office_to_pdf_to_pages_blocks"
+                    reason = "office_converted_to_pdf"
+                else:
+                    used_mode = "txt"
+                    reason = "office_text_layer_available"
+            if input_kind == "image":
+                page_image_path = self._render_page_image(
+                    kb_id=kb_id, doc_id=doc_id, page=1, source_bytes=file_bytes
+                )
+                blocks.append(
+                    ParsedBlock(
+                        block_id="blk-image-1",
+                        block_type="image",
+                        page=1,
+                        text=_build_safe_fallback_text(file_name, file_bytes, "image"),
+                        modality="ocr_text",
+                        generator_impl="image.page_placeholder",
+                        bbox_norm={"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0},
+                        page_image_path=page_image_path,
+                    )
+                )
+                used_mode = "ocr"
+                reason = "single_image_document"
+            elif input_kind == "pdf":
+                import pdfplumber
+
+                with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                    for page_idx, page in enumerate(pdf.pages, start=1):
+                        width = float(page.width or 1)
+                        height = float(page.height or 1)
+                        text = (page.extract_text() or "").strip()
+                        page_image_path = self._page_asset_rel_path(page_idx)
+                        page_img_abs = _doc_root_dir(kb_id, doc_id) / page_image_path
+                        if not page_img_abs.exists():
+                            render = page.to_image(resolution=120)
+                            render.original.save(page_img_abs, format="PNG")
+                        if text and parse_mode in {"auto", "txt"}:
+                            blocks.append(
+                                ParsedBlock(
+                                    block_id=f"blk-text-{page_idx}",
+                                    block_type="text",
+                                    page=page_idx,
+                                    text=text,
+                                    modality="text",
+                                    generator_impl="pdfplumber.extract_text",
+                                    bbox_norm={"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0},
+                                    page_image_path=page_image_path,
+                                )
+                            )
+                        if parse_mode in {"auto", "ocr"}:
+                            for img_idx, img_obj in enumerate(page.images):
+                                bbox = _bbox_from_pdf_obj(
+                                    x0=float(img_obj.get("x0", 0.0)),
+                                    y0=float(img_obj.get("y0", 0.0)),
+                                    x1=float(img_obj.get("x1", width)),
+                                    y1=float(img_obj.get("y1", height)),
+                                    width=width,
+                                    height=height,
+                                )
+                                blocks.append(
+                                    ParsedBlock(
+                                        block_id=f"blk-image-{page_idx}-{img_idx}",
+                                        block_type="image",
+                                        page=page_idx,
+                                        text=text[:500]
+                                        or _build_safe_fallback_text(file_name, file_bytes, "pdf"),
+                                        modality="ocr_text",
+                                        generator_impl="pdfplumber.image_block",
+                                        bbox_norm=bbox,
+                                        page_image_path=page_image_path,
+                                    )
+                                )
+                if not blocks:
+                    used_mode = "ocr"
+                    reason = "no_text_layer_ocr_fallback"
+                    blocks.append(
+                        ParsedBlock(
+                            block_id="blk-fallback-0",
+                            block_type="text",
+                            page=1,
+                            text=_build_safe_fallback_text(file_name, file_bytes, "pdf"),
+                            modality="ocr_fallback_pending",
+                            generator_impl="fallback.decode_or_placeholder",
+                            bbox_norm={"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0},
+                            page_image_path=self._page_asset_rel_path(1),
+                        )
+                    )
+            elif input_kind != "office":
+                segments = extract_segments(file_name=file_name, data=file_bytes)
+                blocks = [
+                    ParsedBlock(
+                        block_id=f"blk-{idx}",
+                        block_type="text",
+                        page=seg.page or 1,
+                        text=seg.text,
+                        modality="text",
+                        generator_impl="extract_segments",
+                        bbox_norm={"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0},
+                    )
+                    for idx, seg in enumerate(segments)
+                    if seg.text and seg.text.strip()
+                ]
+        except Exception:
+            blocks = []
+
+        text_by_page: dict[int, str] = {}
+        for block in blocks:
+            if block.block_type == "text" and block.page:
+                text_by_page[block.page] = (block.text or "")[:300]
+        for block in blocks:
+            if block.block_type != "text":
+                current = text_by_page.get(block.page or 1, "")
+                around = [current]
+                if block.page and block.page > 1:
+                    around.append(text_by_page.get(block.page - 1, ""))
+                around.append(text_by_page.get((block.page or 1) + 1, ""))
+                block.context_text = " ".join([p for p in around if p]).strip()[:400]
+                page_img = block.page_image_path or self._page_asset_rel_path(block.page or 1)
+                block.crop_image_path = self._crop_from_page(
+                    kb_id=kb_id,
+                    doc_id=doc_id,
+                    page_image_path=page_img,
+                    block_id=block.block_id,
+                    bbox_norm=block.bbox_norm,
+                )
+
+        if not blocks:
             fallback_text = _build_safe_fallback_text(file_name, file_bytes, input_kind)
             blocks = [
                 ParsedBlock(
-                    block_id="blk-image-0",
-                    block_type="image",
+                    block_id="blk-fallback-0",
+                    block_type="text",
                     page=1,
                     text=fallback_text,
-                    modality="image",
-                    generator_impl="image.placeholder",
+                    modality="ocr_fallback_pending",
+                    generator_impl="fallback.decode_or_placeholder",
                     bbox_norm={"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0},
                 )
             ]
-            return blocks, {
-                "mode": "ocr",
-                "reason": "image_input_placeholder_block",
-                "input_kind": input_kind,
-                "normalization_mode": normalization_mode,
-                "normalized_to": "blocks",
-                "config_snapshot": multimodal_config,
-            }
+            used_mode = "ocr"
+            reason = "empty_text_layer_fallback"
 
-        # Minimal OCR fallback placeholder path: keep ingestion alive for scanned/empty docs
-        # without leaking raw binary bytes into chunk text / PostgreSQL text columns.
-        fallback_text = _build_safe_fallback_text(file_name, file_bytes, input_kind)
-        blocks = [
-            ParsedBlock(
-                block_id="blk-fallback-0",
-                block_type="text",
-                page=1,
-                text=fallback_text,
-                modality="ocr_fallback_pending",
-                generator_impl="fallback.decode_or_placeholder",
-                bbox_norm={"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0},
-            )
-        ]
-        return blocks, {
-            "mode": "ocr",
-            "reason": "empty_text_layer_fallback",
+        trace = {
+            "mode": used_mode,
+            "reason": reason,
             "input_kind": input_kind,
             "normalization_mode": normalization_mode,
             "normalized_to": "blocks",
             "config_snapshot": multimodal_config,
         }
+        cache_path.write_text(
+            json.dumps(
+                {
+                    "trace": trace,
+                    "blocks": [
+                        {
+                            "block_id": b.block_id,
+                            "block_type": b.block_type,
+                            "page": b.page,
+                            "text": b.text,
+                            "modality": b.modality,
+                            "generator_impl": b.generator_impl,
+                            "bbox_norm": b.bbox_norm,
+                            "page_image_path": b.page_image_path,
+                            "crop_image_path": b.crop_image_path,
+                            "context_text": b.context_text,
+                        }
+                        for b in blocks
+                    ],
+                },
+                ensure_ascii=True,
+            ),
+            encoding="utf-8",
+        )
+        return blocks, trace
 
     async def upload_document(self, kb_id: uuid.UUID, file: UploadFile) -> DocumentRead:
         kb = await self._require_kb(kb_id)
@@ -669,6 +1079,7 @@ class KnowledgeBaseService:
         doc = await self.doc_repo.get(kb_id, doc_id)
         if doc is None:
             raise HTTPException(status_code=404, detail="document not found")
+        self._check_replay_rate_limit(kb_id, doc_id)
         resolved = self._resolve_replay_asset_path(kb_id, doc_id, asset_path)
         if not resolved.is_file():
             raise HTTPException(status_code=404, detail="replay asset not found")
@@ -780,7 +1191,7 @@ class KnowledgeBaseService:
                 char_length=len(row.text),
                 token_length=row.token_length,
                 preview_text=row.text[:400] if include_text else None,
-                source=row.source_metadata or {},
+                source=_normalize_source_metadata(row.source_metadata),
                 created_at=row.created_at,
             )
             for row in rows
@@ -817,10 +1228,33 @@ class KnowledgeBaseService:
         job_id: uuid.UUID,
     ) -> None:
         started_at = time.perf_counter()
-        kb = await self._require_kb(kb_id)
+        try:
+            kb = await self._require_kb(kb_id)
+        except HTTPException as exc:
+            if exc.status_code == 404:
+                logger.warning(
+                    "ingestion_job_dropped_missing_kb",
+                    extra={"kb_id": str(kb_id), "doc_id": str(doc_id), "job_id": str(job_id)},
+                )
+                try:
+                    await self.ingestion_job_service.fail_job(job_id, "knowledge base not found")
+                    await self.session.commit()
+                except Exception:
+                    await self.session.rollback()
+                return
+            raise
         doc = await self.doc_repo.get(kb_id, doc_id)
         if doc is None:
-            raise HTTPException(status_code=404, detail="document not found")
+            logger.warning(
+                "ingestion_job_dropped_missing_doc",
+                extra={"kb_id": str(kb_id), "doc_id": str(doc_id), "job_id": str(job_id)},
+            )
+            try:
+                await self.ingestion_job_service.fail_job(job_id, "document not found")
+                await self.session.commit()
+            except Exception:
+                await self.session.rollback()
+            return
         await self.ingestion_job_service.start_processing(job_id)
         doc.status = "processing"
         doc.error_message = None
@@ -913,10 +1347,14 @@ class KnowledgeBaseService:
             from langchain_text_splitters import RecursiveCharacterTextSplitter
 
             blocks, parse_trace = self._build_blocks_from_segments(
+                kb_id=kb.id,
+                doc_id=doc.id,
                 file_name=doc.file_name or "x.txt",
                 file_bytes=file_bytes,
                 retrieval_config=kb.retrieval_config,
             )
+            blocks, ocr_status = await self._enrich_blocks_with_ocr(kb=kb, doc=doc, blocks=blocks)
+            parse_trace["ocr_status"] = ocr_status
             if not blocks:
                 doc.status = "failed"
                 doc.chunk_count = 0
@@ -930,7 +1368,10 @@ class KnowledgeBaseService:
             )
             chunks_with_source: list[tuple[str, dict]] = []
             for block in blocks:
-                for chunk in splitter.split_text(block.text):
+                chunk_seed = self._build_multimodal_chunk_text(block)
+                limit = kb.chunk_size if block.block_type != "text" else len(chunk_seed)
+                split_source = chunk_seed[:limit]
+                for chunk in splitter.split_text(split_source):
                     chunks_with_source.append(
                         (
                             chunk,
@@ -1000,7 +1441,17 @@ class KnowledgeBaseService:
         except Exception as e:
             await self.session.rollback()
             doc.status = "failed"
-            doc.error_message = str(e)[:2000]
+            # Keep user-facing error concise; log full details for debugging.
+            logger.exception(
+                "ingestion_failed",
+                extra={
+                    "kb_id": str(doc.knowledge_base_id),
+                    "doc_id": str(doc.id),
+                    "error": _sanitize_error_message(str(e)),
+                    "error_type": type(e).__name__,
+                },
+            )
+            doc.error_message = _friendly_ingestion_error_message(e)
             await self.session.commit()
 
     async def delete_document(self, kb_id: uuid.UUID, doc_id: uuid.UUID) -> None:
@@ -1127,7 +1578,7 @@ class KnowledgeBaseService:
                     chunk_index=h.chunk_index,
                     text=h.text,
                     score=h.score,
-                    source=h.source,
+                    source=_normalize_source_metadata(h.source),
                 )
                 for h in hits
             ],

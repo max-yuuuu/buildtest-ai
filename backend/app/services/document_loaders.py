@@ -98,6 +98,49 @@ def _extract_office_via_libreoffice(data: bytes, suffix: str) -> str:
         return out.read_text(encoding="utf-8", errors="replace")
 
 
+def convert_office_to_pdf(*, data: bytes, suffix: str) -> bytes:
+    soffice_cmd = (
+        shutil.which("soffice")
+        or shutil.which("libreoffice")
+        or "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        clean_suffix = suffix if suffix.startswith(".") else f".{suffix}"
+        src = Path(tmp) / f"in{clean_suffix}"
+        src.write_bytes(data)
+        try:
+            subprocess.run(
+                [
+                    soffice_cmd,
+                    "--headless",
+                    "--convert-to",
+                    "pdf",
+                    "--outdir",
+                    tmp,
+                    str(src),
+                ],
+                check=True,
+                capture_output=True,
+                timeout=120,
+            )
+        except FileNotFoundError as e:
+            raise RuntimeError(
+                "未检测到 libreoffice(soffice)。"
+                "若运行在 Docker 容器内，请安装 libreoffice-writer；"
+                "若运行在宿主机，请先安装 LibreOffice 并确保 soffice 在 PATH 中。"
+            ) from e
+        except subprocess.CalledProcessError as e:
+            stderr = e.stderr.decode(errors="replace")[:500] if e.stderr else ""
+            raise RuntimeError(f"libreoffice 转 PDF 失败: {stderr}") from e
+        except subprocess.TimeoutExpired as e:
+            raise RuntimeError("libreoffice 转 PDF 超时(120s)") from e
+
+        out = Path(tmp) / "in.pdf"
+        if not out.is_file():
+            raise RuntimeError("libreoffice 未生成 PDF 输出文件，可能源文件已损坏")
+        return out.read_bytes()
+
+
 def extract_text(*, file_name: str, data: bytes) -> str:
     ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else ""
     if ext in ("txt", "md"):
