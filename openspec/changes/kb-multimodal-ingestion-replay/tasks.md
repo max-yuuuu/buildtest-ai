@@ -1,11 +1,11 @@
 ## 1. Contracts & wiring（先把“能串起来”锁死）
 
 - [ ] 1.1 定义并落地 `source_metadata` 多模态回放契约（block_type/page/bbox_norm/page_image_path/crop_image_path/modality/generator 等），确保 chunks API 与 retrieve API 透传一致
-- [ ] 1.2 为派生资源规划 `upload_dir` 目录结构与命名规范（pages/、crops/、中间缓存等），并定义文档删除/重建时的清理策略
-- [ ] 1.3 在入库流程中引入“结构化 blocks → chunks”的中间表示（替换/扩展现有 `extract_segments`），并确保空文本/扫描件不再直接失败（走 OCR fallback）
-- [ ] 1.4 明确“输入归一化”策略：Office/图片/纯文本 → 统一到 pages（可渲染）与 blocks（可定位），并将归一化产物与原文的血缘写入 `source_metadata.origin`
-- [ ] 1.5 将多模态入库的开关与参数纳入 KB 配置（例如在 `retrieval_config` 或新字段中记录 ocr_model_id / enable_vlm / languages），并在 job 执行时记录“有效配置快照”
-- [ ] 1.6 为 blocks 与 chunks 引入稳定标识：`block_id`（解析器输出）、`asset_id`（page/crop 资源），以及 chunk 与 block 的映射规则，便于回放与 debug
+- [x] 1.2 为派生资源规划 `upload_dir` 目录结构与命名规范（pages/、crops/、中间缓存等），并定义文档删除/重建时的清理策略
+- [x] 1.3 在入库流程中引入“结构化 blocks → chunks”的中间表示（替换/扩展现有 `extract_segments`），并确保空文本/扫描件不再直接失败（走 OCR fallback）
+- [x] 1.4 明确“输入归一化”策略：Office/图片/纯文本 → 统一到 pages（可渲染）与 blocks（可定位），并将归一化产物与原文的血缘写入 `source_metadata.origin`
+- [x] 1.5 将多模态入库的开关与参数纳入 KB 配置（例如在 `retrieval_config` 或新字段中记录 ocr_model_id / enable_vlm / languages），并在 job 执行时记录“有效配置快照”
+- [x] 1.6 为 blocks 与 chunks 引入稳定标识：`block_id`（解析器输出）、`asset_id`（page/crop 资源），以及 chunk 与 block 的映射规则，便于回放与 debug
 
 ## 2. Multimodal parsing & assets generation（解析与回放资源）
 

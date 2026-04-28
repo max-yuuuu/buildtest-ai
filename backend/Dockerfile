@@ -11,6 +11,7 @@ RUN sed -i 's|http://deb.debian.org|https://mirrors.tuna.tsinghua.edu.cn|g' \
     && apt-get update && apt-get install -y --no-install-recommends \
     build-essential curl \
     libreoffice-writer \
+    && if ! command -v soffice >/dev/null 2>&1 && command -v libreoffice >/dev/null 2>&1; then ln -s "$(command -v libreoffice)" /usr/local/bin/soffice; fi \
     && rm -rf /var/lib/apt/lists/*
 
 FROM base AS deps
@@ -32,7 +33,9 @@ FROM python:3.12-slim AS runner
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-RUN apt-get update && apt-get install -y --no-install-recommends curl libreoffice-writer && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends curl libreoffice-writer \
+    && if ! command -v soffice >/dev/null 2>&1 && command -v libreoffice >/dev/null 2>&1; then ln -s "$(command -v libreoffice)" /usr/local/bin/soffice; fi \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /usr/local/lib/python3.12 /usr/local/lib/python3.12
 COPY --from=deps /usr/local/bin /usr/local/bin
 COPY --from=builder /app /app

@@ -18,7 +18,9 @@ class Settings(BaseSettings):
     app_encryption_key: str = ""
 
     upload_max_size_mb: int = 500
-    upload_dir: str = "/app/uploads"
+    # Use a writable local path by default when running backend directly.
+    # Container deployments should override via UPLOAD_DIR (e.g. /app/uploads).
+    upload_dir: str = "./uploads"
 
     celery_task_always_eager: bool = False
 
