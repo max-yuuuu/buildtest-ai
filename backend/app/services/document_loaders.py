@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import re
+import shutil
 import subprocess
 import tempfile
 import zipfile
@@ -15,6 +16,28 @@ from pathlib import Path
 class ExtractedSegment:
     text: str
     page: int | None = None
+
+
+def detect_input_kind(file_name: str) -> str:
+    ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else ""
+    if ext in ("txt", "md"):
+        return "text"
+    if ext == "pdf":
+        return "pdf"
+    if ext in ("doc", "docx"):
+        return "office"
+    return "unknown"
+
+
+def infer_normalization_mode(file_name: str) -> str:
+    kind = detect_input_kind(file_name)
+    if kind == "text":
+        return "text_to_blocks"
+    if kind == "pdf":
+        return "pdf_to_pages_blocks"
+    if kind == "office":
+        return "office_to_text"
+    return "unknown"
 
 
 def infer_section_title(text: str) -> str | None:
@@ -30,13 +53,18 @@ def infer_section_title(text: str) -> str | None:
 
 
 def _extract_doc_via_libreoffice(data: bytes) -> str:
+    soffice_cmd = (
+        shutil.which("soffice")
+        or shutil.which("libreoffice")
+        or "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+    )
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / "in.doc"
         src.write_bytes(data)
         try:
             subprocess.run(
                 [
-                    "soffice",
+                    soffice_cmd,
                     "--headless",
                     "--convert-to",
                     "txt:Text (encoded):UTF8",
@@ -49,7 +77,11 @@ def _extract_doc_via_libreoffice(data: bytes) -> str:
                 timeout=60,
             )
         except FileNotFoundError as e:
-            raise RuntimeError("未检测到 libreoffice(soffice),镜像需安装 libreoffice-writer") from e
+            raise RuntimeError(
+                "未检测到 libreoffice(soffice)。"
+                "若运行在 Docker 容器内，请安装 libreoffice-writer；"
+                "若运行在宿主机，请先安装 LibreOffice 并确保 soffice 在 PATH 中。"
+            ) from e
         except subprocess.CalledProcessError as e:
             stderr = e.stderr.decode(errors="replace")[:500] if e.stderr else ""
             raise RuntimeError(f"libreoffice 转换失败: {stderr}") from e

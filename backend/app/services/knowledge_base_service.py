@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import mimetypes
 import os
+import string
+import shutil
 import time
 import uuid
+from dataclasses import dataclass
 from math import ceil
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,7 +47,12 @@ from app.schemas.knowledge_base import (
     RetrieveResponse,
 )
 from app.services import embedding_client
-from app.services.document_loaders import extract_segments, infer_section_title
+from app.services.document_loaders import (
+    detect_input_kind,
+    extract_segments,
+    infer_normalization_mode,
+    infer_section_title,
+)
 from app.services.ingestion_job_service import IngestionJobService
 from app.services.notification_service import NotificationService
 from app.services.retrieval_strategy import get_retrieval_strategy
@@ -66,6 +76,96 @@ def _estimate_token_length(text: str) -> int:
     if len(words) >= max(1, len(text) // 8):
         return len(words)
     return max(1, ceil(len(text) / 2))
+
+
+def _multimodal_ingestion_config(retrieval_config: dict | None) -> dict:
+    cfg = (retrieval_config or {}).get("multimodal_ingestion", {})
+    return {
+        "ocr_model_id": cfg.get("ocr_model_id"),
+        "enable_vlm": bool(cfg.get("enable_vlm", False)),
+        "languages": list(cfg.get("languages", [])),
+        "parse_mode": cfg.get("parse_mode", "auto"),
+    }
+
+
+def _normalize_retrieval_config(retrieval_config: dict | None) -> dict:
+    base = dict(retrieval_config or {})
+    base["multimodal_ingestion"] = _multimodal_ingestion_config(base)
+    return base
+
+
+MAX_REPLAY_ASSET_BYTES = 20 * 1024 * 1024
+MAX_FALLBACK_TEXT_CHARS = 2000
+
+
+@dataclass
+class ParsedBlock:
+    block_id: str
+    block_type: str
+    page: int | None
+    text: str
+    modality: str
+    generator_impl: str
+
+
+def _doc_root_dir(kb_id: uuid.UUID, doc_id: uuid.UUID) -> Path:
+    return Path(settings.upload_dir) / str(kb_id) / str(doc_id)
+
+
+def _doc_raw_dir(kb_id: uuid.UUID, doc_id: uuid.UUID) -> Path:
+    return _doc_root_dir(kb_id, doc_id) / "raw"
+
+
+def _doc_derived_dir(kb_id: uuid.UUID, doc_id: uuid.UUID) -> Path:
+    return _doc_root_dir(kb_id, doc_id) / "derived"
+
+
+def _doc_pages_dir(kb_id: uuid.UUID, doc_id: uuid.UUID) -> Path:
+    return _doc_derived_dir(kb_id, doc_id) / "pages"
+
+
+def _doc_crops_dir(kb_id: uuid.UUID, doc_id: uuid.UUID) -> Path:
+    return _doc_derived_dir(kb_id, doc_id) / "crops"
+
+
+def _doc_cache_dir(kb_id: uuid.UUID, doc_id: uuid.UUID) -> Path:
+    return _doc_derived_dir(kb_id, doc_id) / "cache"
+
+
+def _strip_unsafe_text_chars(text: str) -> str:
+    allowed_controls = {"\n", "\r", "\t"}
+    cleaned = "".join(
+        ch for ch in text if ch in allowed_controls or (ch >= " " and ch != "\x7f")
+    )
+    return cleaned.replace("\x00", "")
+
+
+def _looks_binary_bytes(data: bytes) -> bool:
+    if not data:
+        return False
+    sample = data[:4096]
+    if b"\x00" in sample:
+        return True
+    textish = sum(
+        1
+        for b in sample
+        if chr(b) in string.printable or b >= 0x80
+    )
+    return (textish / len(sample)) < 0.85
+
+
+def _build_safe_fallback_text(file_name: str, file_bytes: bytes, input_kind: str) -> str:
+    if input_kind in {"pdf", "office"} or _looks_binary_bytes(file_bytes):
+        return (
+            f"[OCR_FALLBACK_PENDING] {file_name}\n"
+            "Document appears to be binary/scanned content without an extractable text layer yet."
+        )
+
+    decoded = file_bytes.decode("utf-8", errors="replace")
+    cleaned = _strip_unsafe_text_chars(decoded).strip()
+    if not cleaned:
+        return f"[OCR_FALLBACK_PENDING] {file_name}"
+    return cleaned[:MAX_FALLBACK_TEXT_CHARS]
 
 
 class KnowledgeBaseService:
@@ -94,6 +194,14 @@ class KnowledgeBaseService:
             raise HTTPException(status_code=422, detail="model must be embedding type")
         if m.vector_dimension is None:
             raise HTTPException(status_code=422, detail="embedding model missing vector_dimension")
+        return m
+
+    async def _get_ocr_model(self, model_pk: uuid.UUID) -> Model:
+        m = await self.model_repo.get(model_pk)
+        if m is None:
+            raise HTTPException(status_code=404, detail="ocr model not found")
+        if m.model_type != "ocr":
+            raise HTTPException(status_code=422, detail="model must be ocr type")
         return m
 
     def _to_kb_read(self, kb: KnowledgeBase, doc_count: int = 0) -> KnowledgeBaseRead:
@@ -146,6 +254,7 @@ class KnowledgeBaseService:
         kb_id = uuid.uuid4()
         dim = m.vector_dimension
         assert dim is not None
+        retrieval_config = await self._validate_multimodal_config(data.retrieval_config)
         kb = KnowledgeBase(
             id=kb_id,
             name=data.name,
@@ -158,7 +267,7 @@ class KnowledgeBaseService:
             chunk_overlap=data.chunk_overlap,
             retrieval_top_k=data.retrieval_top_k,
             retrieval_similarity_threshold=data.retrieval_similarity_threshold,
-            retrieval_config=data.retrieval_config or {},
+            retrieval_config=retrieval_config,
         )
         await self.kb_repo.create(kb)
         await self.session.commit()
@@ -204,7 +313,7 @@ class KnowledgeBaseService:
         if data.retrieval_similarity_threshold is not None:
             kb.retrieval_similarity_threshold = data.retrieval_similarity_threshold
         if data.retrieval_config is not None:
-            kb.retrieval_config = data.retrieval_config
+            kb.retrieval_config = await self._validate_multimodal_config(data.retrieval_config)
         if kb.chunk_overlap >= kb.chunk_size:
             raise HTTPException(status_code=422, detail="chunk_overlap 必须小于 chunk_size")
         await self.kb_repo.save(kb)
@@ -243,6 +352,111 @@ class KnowledgeBaseService:
             raise HTTPException(status_code=404, detail="knowledge base not found")
         return kb
 
+    async def _validate_multimodal_config(self, retrieval_config: dict | None) -> dict:
+        normalized = _normalize_retrieval_config(retrieval_config)
+        multimodal_cfg = normalized.get("multimodal_ingestion", {})
+        ocr_model_id = multimodal_cfg.get("ocr_model_id")
+        if ocr_model_id:
+            try:
+                ocr_model_uuid = uuid.UUID(str(ocr_model_id))
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail="ocr_model_id 不是合法 UUID") from exc
+            await self._get_ocr_model(ocr_model_uuid)
+            multimodal_cfg["ocr_model_id"] = str(ocr_model_uuid)
+        normalized["multimodal_ingestion"] = multimodal_cfg
+        return normalized
+
+    def _ensure_doc_dirs(self, kb_id: uuid.UUID, doc_id: uuid.UUID) -> None:
+        _doc_raw_dir(kb_id, doc_id).mkdir(parents=True, exist_ok=True)
+        _doc_pages_dir(kb_id, doc_id).mkdir(parents=True, exist_ok=True)
+        _doc_crops_dir(kb_id, doc_id).mkdir(parents=True, exist_ok=True)
+        _doc_cache_dir(kb_id, doc_id).mkdir(parents=True, exist_ok=True)
+
+    def _cleanup_doc_derived_assets(self, kb_id: uuid.UUID, doc_id: uuid.UUID) -> None:
+        derived_dir = _doc_derived_dir(kb_id, doc_id)
+        if derived_dir.exists():
+            shutil.rmtree(derived_dir)
+        self._ensure_doc_dirs(kb_id, doc_id)
+
+    def _cleanup_doc_all_assets(self, kb_id: uuid.UUID, doc_id: uuid.UUID) -> None:
+        root_dir = _doc_root_dir(kb_id, doc_id)
+        if root_dir.exists():
+            shutil.rmtree(root_dir)
+
+    def _resolve_replay_asset_path(
+        self, kb_id: uuid.UUID, doc_id: uuid.UUID, asset_path: str
+    ) -> Path:
+        raw_asset_path = (asset_path or "").strip()
+        if not raw_asset_path:
+            raise HTTPException(status_code=422, detail="asset_path 不能为空")
+        rel_path = Path(raw_asset_path)
+        if rel_path.is_absolute() or ".." in rel_path.parts:
+            raise HTTPException(status_code=422, detail="asset_path 非法")
+        allowed_prefixes = {
+            Path("derived/pages"),
+            Path("derived/crops"),
+        }
+        if not any(rel_path.parts[: len(prefix.parts)] == prefix.parts for prefix in allowed_prefixes):
+            raise HTTPException(status_code=422, detail="仅允许访问 derived/pages 或 derived/crops")
+        root_dir = _doc_root_dir(kb_id, doc_id).resolve()
+        resolved = (root_dir / rel_path).resolve()
+        try:
+            resolved.relative_to(root_dir)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="asset_path 超出文档目录") from exc
+        return resolved
+
+    def _build_blocks_from_segments(
+        self, *, file_name: str, file_bytes: bytes, retrieval_config: dict | None = None
+    ) -> tuple[list[ParsedBlock], dict]:
+        input_kind = detect_input_kind(file_name)
+        normalization_mode = infer_normalization_mode(file_name)
+        multimodal_config = _multimodal_ingestion_config(retrieval_config)
+        segments = extract_segments(file_name=file_name, data=file_bytes)
+        if segments:
+            blocks = [
+                ParsedBlock(
+                    block_id=f"blk-{idx}",
+                    block_type="text",
+                    page=seg.page,
+                    text=seg.text,
+                    modality="text",
+                    generator_impl="extract_segments",
+                )
+                for idx, seg in enumerate(segments)
+                if seg.text and seg.text.strip()
+            ]
+            return blocks, {
+                "mode": "txt",
+                "reason": "text_layer_available",
+                "input_kind": input_kind,
+                "normalization_mode": normalization_mode,
+                "normalized_to": "blocks",
+                "config_snapshot": multimodal_config,
+            }
+
+        # Minimal OCR fallback placeholder path: keep ingestion alive for scanned/empty docs
+        # without leaking raw binary bytes into chunk text / PostgreSQL text columns.
+        fallback_text = _build_safe_fallback_text(file_name, file_bytes, input_kind)
+        blocks = [
+            ParsedBlock(
+                block_id="blk-fallback-0",
+                block_type="text",
+                page=1,
+                text=fallback_text,
+                modality="ocr_fallback_pending",
+                generator_impl="fallback.decode_or_placeholder",
+            )
+        ]
+        return blocks, {
+            "mode": "ocr",
+            "reason": "empty_text_layer_fallback",
+            "input_kind": input_kind,
+            "normalization_mode": normalization_mode,
+            "normalized_to": "blocks",
+            "config_snapshot": multimodal_config,
+        }
+
     async def upload_document(self, kb_id: uuid.UUID, file: UploadFile) -> DocumentRead:
         kb = await self._require_kb(kb_id)
         raw_name = file.filename or "upload.bin"
@@ -266,9 +480,8 @@ class KnowledgeBaseService:
         )
         await self.doc_repo.create(doc)
         await self.session.flush()
-        base = Path(settings.upload_dir) / str(kb_id) / str(doc.id)
-        base.mkdir(parents=True, exist_ok=True)
-        dest = base / safe_name
+        self._ensure_doc_dirs(kb_id, doc.id)
+        dest = _doc_raw_dir(kb_id, doc.id) / safe_name
         dest.write_bytes(data)
         rel = str(dest.relative_to(Path(settings.upload_dir)))
         doc.storage_path = rel
@@ -317,9 +530,8 @@ class KnowledgeBaseService:
             )
             await self.doc_repo.create(doc)
             await self.session.flush()
-            base = Path(settings.upload_dir) / str(kb_id) / str(doc.id)
-            base.mkdir(parents=True, exist_ok=True)
-            dest = base / safe_name
+            self._ensure_doc_dirs(kb_id, doc.id)
+            dest = _doc_raw_dir(kb_id, doc.id) / safe_name
             dest.write_bytes(data)
             rel = str(dest.relative_to(Path(settings.upload_dir)))
             doc.storage_path = rel
@@ -357,6 +569,22 @@ class KnowledgeBaseService:
         if job is None:
             raise HTTPException(status_code=404, detail="ingestion job not found")
         return IngestionJobRead.model_validate(job)
+
+    async def get_replay_asset(
+        self, kb_id: uuid.UUID, doc_id: uuid.UUID, asset_path: str
+    ) -> FileResponse:
+        await self._require_kb(kb_id)
+        doc = await self.doc_repo.get(kb_id, doc_id)
+        if doc is None:
+            raise HTTPException(status_code=404, detail="document not found")
+        resolved = self._resolve_replay_asset_path(kb_id, doc_id, asset_path)
+        if not resolved.is_file():
+            raise HTTPException(status_code=404, detail="replay asset not found")
+        size = resolved.stat().st_size
+        if size > MAX_REPLAY_ASSET_BYTES:
+            raise HTTPException(status_code=413, detail="replay asset too large")
+        media_type = mimetypes.guess_type(resolved.name)[0] or "application/octet-stream"
+        return FileResponse(path=resolved, media_type=media_type, filename=resolved.name)
 
     async def retry_latest_ingestion_job(
         self, kb_id: uuid.UUID, doc_id: uuid.UUID
@@ -592,11 +820,15 @@ class KnowledgeBaseService:
         try:
             from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-            segments = extract_segments(file_name=doc.file_name or "x.txt", data=file_bytes)
-            if not segments:
+            blocks, parse_trace = self._build_blocks_from_segments(
+                file_name=doc.file_name or "x.txt",
+                file_bytes=file_bytes,
+                retrieval_config=kb.retrieval_config,
+            )
+            if not blocks:
                 doc.status = "failed"
                 doc.chunk_count = 0
-                doc.error_message = "未抽取到文本内容，请确认文件不是扫描件或已损坏"
+                doc.error_message = "文档解析未产出可用 blocks"
                 await conn.delete_by_document(key, doc.id)
                 await self.session.commit()
                 return
@@ -605,14 +837,44 @@ class KnowledgeBaseService:
                 chunk_overlap=kb.chunk_overlap,
             )
             chunks_with_source: list[tuple[str, dict]] = []
-            for seg in segments:
-                for chunk in splitter.split_text(seg.text):
+            for block in blocks:
+                asset_id = f"asset:{doc.id}:{block.block_id}"
+                config_snapshot = parse_trace.get("config_snapshot", {})
+                generator_meta = {
+                    "impl": block.generator_impl,
+                }
+                if block.modality.startswith("ocr"):
+                    generator_meta["capability"] = "ocr"
+                    if config_snapshot.get("ocr_model_id"):
+                        generator_meta["model_id"] = config_snapshot["ocr_model_id"]
+                for chunk in splitter.split_text(block.text):
                     chunks_with_source.append(
                         (
                             chunk,
                             {
-                                "page": seg.page,
+                                "page": block.page,
                                 "section": infer_section_title(chunk),
+                                "block_type": block.block_type,
+                                "block_id": block.block_id,
+                                "asset_id": asset_id,
+                                "modality": block.modality,
+                                "generator": generator_meta,
+                                "origin": {
+                                    "file_name": doc.file_name,
+                                    "file_type": doc.file_type,
+                                    "storage_path": doc.storage_path,
+                                    "input_kind": parse_trace.get("input_kind"),
+                                    "normalization_mode": parse_trace.get("normalization_mode"),
+                                    "normalized_to": parse_trace.get("normalized_to"),
+                                },
+                                "context": {
+                                    "parse_trace": parse_trace,
+                                    "chunk_block_ref": {
+                                        "document_id": str(doc.id),
+                                        "block_id": block.block_id,
+                                        "asset_id": asset_id,
+                                    },
+                                },
                             },
                         )
                     )
@@ -672,6 +934,7 @@ class KnowledgeBaseService:
             doc.error_message = None
             await self.session.commit()
         except Exception as e:
+            await self.session.rollback()
             doc.status = "failed"
             doc.error_message = str(e)[:2000]
             await self.session.commit()
@@ -688,6 +951,7 @@ class KnowledgeBaseService:
             await conn.delete_by_document(key, doc_id)
         except Exception as e:
             doc.error_message = f"向量清理失败: {e}"[:2000]
+        self._cleanup_doc_all_assets(kb_id, doc_id)
         await self.doc_repo.soft_delete(doc)
         await self.session.commit()
 
@@ -716,6 +980,8 @@ class KnowledgeBaseService:
             doc.error_message = "原文文件不存在"
             await self.session.commit()
             return
+        # Rebuild keeps original upload, clears derived assets for deterministic regeneration.
+        self._cleanup_doc_derived_assets(kb.id, doc.id)
         data = path.read_bytes()
         await self._ingest_document(kb, doc, data)
         await self.session.refresh(doc)

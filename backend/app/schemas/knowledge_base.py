@@ -1,8 +1,57 @@
 import uuid
 from datetime import datetime
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class BBoxNorm(BaseModel):
+    """Normalized bbox in [0..1] coordinate space."""
+
+    x0: float = Field(ge=0.0, le=1.0)
+    y0: float = Field(ge=0.0, le=1.0)
+    x1: float = Field(ge=0.0, le=1.0)
+    y1: float = Field(ge=0.0, le=1.0)
+
+
+class SourceOrigin(BaseModel):
+    file_name: str | None = None
+    file_type: str | None = None
+    storage_path: str | None = None
+    input_kind: str | None = None
+    normalization_mode: str | None = None
+    normalized_to: str | None = None
+
+
+class SourceGenerator(BaseModel):
+    """Trace which model/tool produced a derived field (OCR/caption/etc.)."""
+
+    capability: str | None = None  # e.g. "ocr", "vlm"
+    provider_id: uuid.UUID | None = None
+    model_id: uuid.UUID | None = None
+    impl: str | None = None  # e.g. "paddleocr", "extract_segments"
+
+
+class SourceMetadata(BaseModel):
+    """Retrieval lineage contract. Shared by chunk inspection and retrieval hits."""
+
+    # Existing/legacy fields (kept for backward compatibility)
+    page: int | None = None
+    section: str | None = None
+
+    # Multimodal replay fields
+    block_type: Literal["text", "image", "table", "equation"] | None = None
+    block_id: str | None = None
+    asset_id: str | None = None
+    bbox_norm: BBoxNorm | None = None
+    page_image_path: str | None = None
+    crop_image_path: str | None = None
+
+    # Optional enrichment fields
+    modality: str | None = None  # e.g. "ocr_text", "vision_caption"
+    generator: SourceGenerator | None = None
+    origin: SourceOrigin | None = None
+    context: dict | None = None
 
 
 class KnowledgeBaseCreate(BaseModel):
@@ -79,7 +128,7 @@ class DocumentChunkRead(BaseModel):
     char_length: int
     token_length: int | None = None
     preview_text: str | None = None
-    source: dict = Field(default_factory=dict)
+    source: SourceMetadata = Field(default_factory=SourceMetadata)
     created_at: datetime
 
 
@@ -144,7 +193,7 @@ class RetrieveHit(BaseModel):
     chunk_index: int
     text: str
     score: float
-    source: dict | None = None
+    source: SourceMetadata | None = None
 
 
 class RetrieveResponse(BaseModel):
