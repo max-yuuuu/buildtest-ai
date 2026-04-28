@@ -10,10 +10,16 @@ def test_llm_model_accepts_no_vector_dim():
     assert m.vector_dimension is None
 
 
-def test_embedding_model_requires_vector_dim():
-    with pytest.raises(ValidationError) as exc:
-        ModelCreate(model_id="text-embedding-3-small", model_type="embedding")
-    assert "vector_dimension" in str(exc.value)
+def test_ocr_model_accepts_no_vector_dim():
+    m = ModelCreate(model_id="paddleocr-ppocrv5", model_type="ocr")
+    assert m.model_type == "ocr"
+    assert m.vector_dimension is None
+
+
+def test_embedding_model_allows_auto_probe_without_vector_dim():
+    m = ModelCreate(model_id="text-embedding-3-small", model_type="embedding")
+    assert m.model_type == "embedding"
+    assert m.vector_dimension is None
 
 
 def test_embedding_model_ok_with_vector_dim():

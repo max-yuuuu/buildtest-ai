@@ -67,6 +67,19 @@ async def test_embedding_with_dim_ok(client, user_headers):
     assert resp.json()["vector_dimension"] == 1536
 
 
+async def test_ocr_model_registration_ok(client, user_headers):
+    pid = await _create_provider(client, user_headers)
+    resp = await client.post(
+        f"/api/v1/providers/{pid}/models",
+        json={"model_id": "paddleocr-ppocrv5", "model_type": "ocr"},
+        headers=user_headers,
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["model_type"] == "ocr"
+    assert body["vector_dimension"] is None
+
+
 async def test_update_model(client, user_headers):
     pid = await _create_provider(client, user_headers)
     r = await client.post(

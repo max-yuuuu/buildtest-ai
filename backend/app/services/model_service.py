@@ -62,7 +62,7 @@ class ModelService:
         if existing is not None:
             raise HTTPException(status_code=409, detail="model already registered")
         vector_dimension = data.vector_dimension
-        if data.model_type == "embedding":
+        if data.model_type == "embedding" and vector_dimension is None:
             vector_dimension = await self.probe_embedding_dimension(
                 provider_id, data.model_id, provider
             )
@@ -72,9 +72,7 @@ class ModelService:
             model_type=data.model_type,
             context_window=data.context_window,
             vector_dimension=vector_dimension,
-            embedding_batch_size=(
-                data.embedding_batch_size if data.model_type == "embedding" else None
-            ),
+            embedding_batch_size=(data.embedding_batch_size if data.model_type == "embedding" else None),
         )
         if m.model_type == "embedding" and m.embedding_batch_size is None:
             m.embedding_batch_size = self.EMBEDDING_BATCH_SIZE_DEFAULT
@@ -102,12 +100,14 @@ class ModelService:
             m.vector_dimension = data.vector_dimension
         if data.embedding_batch_size is not None:
             m.embedding_batch_size = data.embedding_batch_size
-        if m.model_type == "embedding":
+        if m.model_type == "embedding" and m.vector_dimension is None:
             m.vector_dimension = await self.probe_embedding_dimension(
                 provider_id, m.model_id, provider
             )
             if m.embedding_batch_size is None:
                 m.embedding_batch_size = self.EMBEDDING_BATCH_SIZE_DEFAULT
+        if m.model_type == "ocr":
+            m.vector_dimension = None
         # batch_size 仅 embedding 模型有意义;改为非 embedding 时顺带清空,避免字段语义漂移
         if m.model_type != "embedding" and m.embedding_batch_size is not None:
             m.embedding_batch_size = None
@@ -271,6 +271,8 @@ class ModelService:
 def _infer_model_type(model_id: str) -> str:
     """按 model_id 前缀/子串推断类型。保守策略:只识别明确含 embedding 的,其余默认 llm。"""
     lower = model_id.lower()
+    if "ocr" in lower:
+        return "ocr"
     # Treat "embed" as a token (e.g. nomic-embed-text:latest). Keep conservative to
     # avoid matching unrelated words like "embedded".
     if "embedding" in lower or re.search(r"(^|[-_/])embed(ding)?($|[-_:/])", lower) is not None:
