@@ -62,3 +62,11 @@ async def test_vector_db(
     session: AsyncSession = Depends(get_session),
 ) -> VectorDbTestResult:
     return await VectorDbService(session, user_id).test_connection(config_id)
+
+
+@router.get("/active/probe", response_model=VectorDbTestResult)
+async def test_active_vector_db(
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> VectorDbTestResult:
+    return await VectorDbService(session, user_id).test_active_connection()

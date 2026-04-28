@@ -21,17 +21,17 @@ Postgres 容器是空库,Alembic 迁移没有跑过。SQLAlchemy 模型定义存
 
 **解决**
 
-在 backend 容器里执行迁移:
+在 backend 容器里执行迁移（开发分层 compose）:
 
 ```bash
-docker compose exec backend alembic upgrade head
+docker compose -f compose.base.yml -f compose.dev.yml exec backend alembic upgrade head
 ```
 
 之后修改模型时:
 
 ```bash
-docker compose exec backend alembic revision --autogenerate -m "描述"
-docker compose exec backend alembic upgrade head
+docker compose -f compose.base.yml -f compose.dev.yml exec backend alembic revision --autogenerate -m "描述"
+docker compose -f compose.base.yml -f compose.dev.yml exec backend alembic upgrade head
 ```
 
 > 注意:若 backend 镜像使用仓库内 `docker-entrypoint.sh`,容器启动时会先执行 `alembic upgrade head`。若未使用该入口或未重建镜像,仍需手动执行上述命令。
@@ -50,11 +50,33 @@ Postgres 镜像不含 `vector` 扩展,或库从未执行过 `CREATE EXTENSION ve
 
 **解决**
 
-1. 确认 `docker-compose.yml` 中 `postgres` 使用 `pgvector/pgvector:pg16` 并已 `docker compose pull postgres` / 重建容器。
+1. 确认 `compose.base.yml` 或 `compose.infra.yml` 中 `postgres` 使用 `pgvector/pgvector:pg16` 并已 pull / 重建容器。
 2. **已有数据卷**时在 Postgres 容器内执行一次:
 
 ```bash
-docker compose exec postgres psql -U buildtest -d buildtest -c "CREATE EXTENSION IF NOT EXISTS vector;"
+docker compose -f compose.infra.yml exec postgres psql -U buildtest -d buildtest -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
 然后在前端对该向量库配置再点「测试连接」。
+
+---
+
+## 3. 切换到 active 向量库后依然不可用
+
+**现象**
+
+向量库配置 `is_active=true` 后，文档入库或检索仍报连接异常。
+
+**原因**
+
+基础设施健康仅代表容器存活，不代表当前 active 配置的连接串、API Key 或路由有效。
+
+**解决**
+
+先检查基础设施，再检查应用层 active 向量库探测：
+
+```bash
+make doctor
+```
+
+`make doctor` 会依次检查 Postgres/Redis/Qdrant，然后执行应用层 active vector probe。若失败，按输出修正 active 配置后重试。

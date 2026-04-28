@@ -30,6 +30,8 @@ class VectorDbConfigRepository:
 
     async def create(self, row: VectorDbConfig) -> VectorDbConfig:
         row.user_id = self.user_id
+        if row.is_active:
+            await self.deactivate_others(exclude_id=None)
         self.session.add(row)
         await self.session.flush()
         return row
@@ -39,3 +41,21 @@ class VectorDbConfigRepository:
 
         row.deleted_at = datetime.now(UTC)
         await self.session.flush()
+
+    async def deactivate_others(self, exclude_id: uuid.UUID | None) -> None:
+        items = await self.list()
+        for item in items:
+            if exclude_id is not None and item.id == exclude_id:
+                continue
+            if item.is_active:
+                item.is_active = False
+        await self.session.flush()
+
+    async def get_active(self) -> VectorDbConfig | None:
+        result = await self.session.execute(
+            self._base_stmt()
+            .where(VectorDbConfig.is_active.is_(True))
+            .order_by(VectorDbConfig.updated_at.desc(), VectorDbConfig.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()

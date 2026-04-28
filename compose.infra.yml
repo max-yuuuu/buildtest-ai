@@ -1,5 +1,4 @@
 services:
-  # Backward-compatible infra-only compose file.
   postgres:
     image: pgvector/pgvector:pg16
     environment:

@@ -2,8 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-INFRA_COMPOSE_FILE="${ROOT_DIR}/docker-compose.infra.yml"
-FULL_COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml"
+COMPOSE_BASE_FILE="${ROOT_DIR}/compose.base.yml"
+COMPOSE_DEV_FILE="${ROOT_DIR}/compose.dev.yml"
+COMPOSE_PROD_FILE="${ROOT_DIR}/compose.prod.yml"
+INFRA_COMPOSE_FILE="${ROOT_DIR}/compose.infra.yml"
 
 info() { printf '%s\n' "$*"; }
 err() { printf '%s\n' "$*" >&2; }
@@ -15,25 +17,29 @@ Usage:
 
 Commands:
   infra                 Start postgres/redis/qdrant via docker compose
+  dev                   Start full development compose stack (base + dev)
+  prod                  Start full production compose stack (base + prod)
   backend               Start backend on host (uvicorn --reload)
   worker                Start celery worker on host
   frontend              Start frontend on host (pnpm dev)
   up                    Start infra + backend(host) + worker(host) + frontend(host)
-  full                  Start full stack via docker compose
+  full                  Alias of dev
   logs [service]        Tail docker compose logs (full compose by default)
   doctor                Verify infra connectivity (postgres/redis/qdrant)
+  validate-compose      Validate infra/dev/prod compose configurations
   print-env             Print resolved key env values
 
 Environment files (loaded in order, later overrides earlier):
-  env/dev.shared
+  env/common.env
   .env
-  env/dev.<profile>
+  env/<profile>.env
 
 Profiles used by commands:
-  backend   -> env/dev.backend-host
-  worker    -> env/dev.backend-host
-  frontend  -> env/dev.frontend-host
-  up        -> backend-host + frontend-host
+  backend   -> env/dev.host.env
+  worker    -> env/dev.host.env
+  frontend  -> env/dev.host.env
+  up        -> env/dev.host.env
+  dev/prod  -> docker compose env_file (env/dev.docker.env or env/prod.env)
 EOF
 }
 
@@ -77,10 +83,10 @@ load_env_file() {
 }
 
 load_env_profiles() {
-  load_env_file "${ROOT_DIR}/env/dev.shared"
+  load_env_file "${ROOT_DIR}/env/common.env"
   load_env_file "${ROOT_DIR}/.env"
   for profile in "$@"; do
-    load_env_file "${ROOT_DIR}/env/dev.${profile}"
+    load_env_file "${ROOT_DIR}/env/${profile}.env"
   done
   normalize_path_env
 }
@@ -95,7 +101,7 @@ normalize_path_env() {
 }
 
 ensure_profile_file() {
-  local file="${ROOT_DIR}/env/dev.${1}"
+  local file="${ROOT_DIR}/env/${1}.env"
   local example="${file}.example"
   if [[ ! -f "$file" && -f "$example" ]]; then
     err "Missing ${file} (copy from ${example})"
@@ -127,9 +133,22 @@ docker_infra() {
   docker compose -f "$INFRA_COMPOSE_FILE" up -d
 }
 
-docker_full() {
+docker_dev() {
   require_cmd docker
-  docker compose -f "$FULL_COMPOSE_FILE" up --build
+  docker compose -f "$COMPOSE_BASE_FILE" -f "$COMPOSE_DEV_FILE" up --build
+}
+
+docker_prod() {
+  require_cmd docker
+  docker compose -f "$COMPOSE_BASE_FILE" -f "$COMPOSE_PROD_FILE" up --build -d
+}
+
+validate_compose() {
+  require_cmd docker
+  docker compose -f "$INFRA_COMPOSE_FILE" config --quiet
+  docker compose -f "$COMPOSE_BASE_FILE" -f "$COMPOSE_DEV_FILE" config --quiet
+  docker compose -f "$COMPOSE_BASE_FILE" -f "$COMPOSE_PROD_FILE" config --quiet
+  info "OK: compose.infra/dev/prod configurations are valid"
 }
 
 cmd_print_env() {
@@ -144,8 +163,9 @@ cmd_print_env() {
 }
 
 cmd_backend() {
-  ensure_profile_file backend-host
-  load_env_profiles backend-host
+  ensure_profile_file dev.host
+  load_env_profiles dev.host
+  validate_address_mode host
   ensure_backend_deps
   (
     cd "${ROOT_DIR}/backend"
@@ -155,8 +175,9 @@ cmd_backend() {
 }
 
 cmd_worker() {
-  ensure_profile_file backend-host
-  load_env_profiles backend-host
+  ensure_profile_file dev.host
+  load_env_profiles dev.host
+  validate_address_mode host
   ensure_backend_deps
   (
     cd "${ROOT_DIR}/backend"
@@ -165,8 +186,9 @@ cmd_worker() {
 }
 
 cmd_frontend() {
-  ensure_profile_file frontend-host
-  load_env_profiles frontend-host
+  ensure_profile_file dev.host
+  load_env_profiles dev.host
+  validate_address_mode host
   require_cmd pnpm
   (
     cd "${ROOT_DIR}/frontend"
@@ -178,9 +200,9 @@ cmd_logs() {
   require_cmd docker
   local service="${1-}"
   if [[ -n "$service" ]]; then
-    docker compose -f "$FULL_COMPOSE_FILE" logs -f "$service"
+    docker compose -f "$COMPOSE_BASE_FILE" -f "$COMPOSE_DEV_FILE" logs -f "$service"
   else
-    docker compose -f "$FULL_COMPOSE_FILE" logs -f
+    docker compose -f "$COMPOSE_BASE_FILE" -f "$COMPOSE_DEV_FILE" logs -f
   fi
 }
 
@@ -214,16 +236,26 @@ cmd_doctor() {
     err "Qdrant health check failed at localhost:6333"
     exit 1
   fi
+
+  info "Checking active vector config probe via app layer..."
+  ensure_profile_file dev.host
+  load_env_profiles dev.host
+  validate_address_mode host
+  ensure_backend_deps
+  (
+    cd "${ROOT_DIR}/backend"
+    PYTHONPATH=. uv run python scripts/probe_active_vector_runtime.py
+  )
 }
 
 cmd_up() {
-  ensure_profile_file backend-host
-  ensure_profile_file frontend-host
+  ensure_profile_file dev.host
   docker_infra
 
   info "Starting backend(host) + worker(host) + frontend(host). Press Ctrl+C to stop."
 
-  load_env_profiles backend-host frontend-host
+  load_env_profiles dev.host
+  validate_address_mode host
   cmd_print_env
   ensure_backend_deps
 
@@ -274,6 +306,12 @@ main() {
     infra)
       docker_infra
       ;;
+    dev)
+      docker_dev
+      ;;
+    prod)
+      docker_prod
+      ;;
     backend)
       cmd_backend
       ;;
@@ -287,7 +325,7 @@ main() {
       cmd_up
       ;;
     full)
-      docker_full
+      docker_dev
       ;;
     logs)
       cmd_logs "$@"
@@ -295,8 +333,11 @@ main() {
     doctor)
       cmd_doctor
       ;;
+    validate-compose)
+      validate_compose
+      ;;
     print-env)
-      load_env_profiles backend-host frontend-host
+      load_env_profiles dev.host
       cmd_print_env
       ;;
     -h|--help|help|"")
@@ -308,6 +349,28 @@ main() {
       exit 1
       ;;
   esac
+}
+
+validate_address_mode() {
+  local mode="$1"
+  if [[ "$mode" == "host" ]]; then
+    if [[ "${DATABASE_URL-}" != *"@localhost:"* ]]; then
+      err "DATABASE_URL must use localhost when app runs on host"
+      exit 1
+    fi
+    if [[ "${REDIS_URL-}" != redis://localhost:* ]]; then
+      err "REDIS_URL must use localhost when app runs on host"
+      exit 1
+    fi
+    if [[ "${QDRANT_URL-}" != http://localhost:* ]]; then
+      err "QDRANT_URL must use localhost when app runs on host"
+      exit 1
+    fi
+    if [[ "${BACKEND_URL-}" != http://localhost:* ]]; then
+      err "BACKEND_URL must use localhost when frontend runs on host"
+      exit 1
+    fi
+  fi
 }
 
 main "$@"

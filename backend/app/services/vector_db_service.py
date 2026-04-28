@@ -57,6 +57,15 @@ class VectorDbService:
             api_key_mask=api_mask,
             is_active=data.is_active,
         )
+        if row.is_active:
+            probe = await vector_db_probe.probe(
+                row.db_type, row.connection_string, row.api_key_encrypted
+            )
+            if not probe.ok:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"active vector db probe failed: {probe.message}",
+                )
         await self.repo.create(row)
         await self.session.commit()
         await self.session.refresh(row)
@@ -80,6 +89,16 @@ class VectorDbService:
                 row.api_key_mask = mask_api_key_optional(data.api_key)
         if data.is_active is not None:
             row.is_active = data.is_active
+        if row.is_active:
+            probe = await vector_db_probe.probe(
+                row.db_type, row.connection_string, row.api_key_encrypted
+            )
+            if not probe.ok:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"active vector db probe failed: {probe.message}",
+                )
+            await self.repo.deactivate_others(exclude_id=row.id)
         await self.session.commit()
         await self.session.refresh(row)
         return self._to_read(row)
@@ -97,3 +116,11 @@ class VectorDbService:
             raise HTTPException(status_code=404, detail="vector db config not found")
         api_plain = row.api_key_encrypted
         return await vector_db_probe.probe(row.db_type, row.connection_string, api_plain)
+
+    async def test_active_connection(self) -> VectorDbTestResult:
+        row = await self.repo.get_active()
+        if row is None:
+            raise HTTPException(status_code=404, detail="active vector db config not found")
+        return await vector_db_probe.probe(
+            row.db_type, row.connection_string, row.api_key_encrypted
+        )
