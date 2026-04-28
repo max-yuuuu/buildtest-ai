@@ -204,7 +204,62 @@ class ModelService:
                 texts=["dimension_probe"],
             )
         except embedding_client.EmbeddingError as e:
-            raise HTTPException(status_code=502, detail=f"探测 embedding 维度失败: {e}") from e
+            msg = str(e)
+            lower = msg.lower()
+            is_quota_or_billing = (
+                "allocationquota" in lower
+                or "freetieronly" in lower
+                or "free tier" in lower
+                or "quota" in lower
+                or "insufficient_quota" in lower
+            )
+
+            # Try to extract concise upstream info from the SDK error string, to avoid
+            # dumping a huge JSON blob into the user-facing message.
+            extracted_code: str | None = None
+            extracted_message: str | None = None
+            m_code = re.search(r"'code'\s*:\s*'([^']+)'", msg)
+            if m_code:
+                extracted_code = m_code.group(1)
+            m_message = re.search(r"'message'\s*:\s*'([^']+)'", msg)
+            if m_message:
+                extracted_message = m_message.group(1)
+
+            effective_base_url = p.base_url or "https://api.openai.com/v1"
+            if is_quota_or_billing:
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "code": "embedding_dimension_probe_failed",
+                        "message": "无法自动探测向量维度：上游 embedding 接口因额度/计费限制拒绝请求",
+                        "suggestions": [
+                            "在百炼控制台关闭“仅使用免费额度(Free tier only)”或充值/更换有额度的模型",
+                            "在平台登记模型时手动填写 vector_dimension（可跳过自动探测）",
+                        ],
+                        "debug": {
+                            "provider_type": p.provider_type,
+                            "base_url": effective_base_url,
+                            "model_id": model_id,
+                            "upstream_code": extracted_code,
+                            "upstream_message": extracted_message,
+                            "raw_error": msg[:1200],
+                        },
+                    },
+                ) from e
+
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "code": "embedding_dimension_probe_failed",
+                    "message": "无法自动探测向量维度：embedding 接口调用失败",
+                    "debug": {
+                        "provider_type": p.provider_type,
+                        "base_url": effective_base_url,
+                        "model_id": model_id,
+                        "raw_error": msg[:1200],
+                    },
+                },
+            ) from e
         if not vectors or not vectors[0]:
             raise HTTPException(
                 status_code=502,
