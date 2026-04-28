@@ -30,14 +30,27 @@ async def _embedding_model_id(client, headers, pid):
     return r.json()["id"]
 
 
+async def _ocr_model_id(client, headers, pid):
+    r = await client.post(
+        f"/api/v1/providers/{pid}/models",
+        json={
+            "model_id": "paddleocr-ppocrv5",
+            "model_type": "ocr",
+        },
+        headers=headers,
+    )
+    assert r.status_code == 201
+    return r.json()["id"]
+
+
 async def _vector_db_id(client, headers):
     r = await client.post(
         "/api/v1/vector-dbs",
         json={
-            "name": "pg-local",
+            "name": f"pg-local-{uuid.uuid4().hex[:8]}",
             "db_type": "postgres_pgvector",
             "connection_string": "postgresql://x:y@127.0.0.1:9/db",
-            "is_active": True,
+            "is_active": False,
         },
         headers=headers,
     )
@@ -166,6 +179,55 @@ async def test_kb_create_rejects_bad_chunk_overlap(client, user_headers):
         headers=user_headers,
     )
     assert r.status_code == 422
+
+
+async def test_kb_create_rejects_non_ocr_model_as_ocr_config(client, user_headers):
+    pid = await _provider_id(client, user_headers)
+    embedding_mid = await _embedding_model_id(client, user_headers, pid)
+    vid = await _vector_db_id(client, user_headers)
+    r = await client.post(
+        "/api/v1/knowledge-bases",
+        json={
+            "name": "x",
+            "vector_db_config_id": vid,
+            "embedding_model_id": embedding_mid,
+            "retrieval_config": {
+                "multimodal_ingestion": {
+                    "ocr_model_id": embedding_mid,
+                }
+            },
+        },
+        headers=user_headers,
+    )
+    assert r.status_code == 422
+    assert "ocr type" in r.json()["detail"]
+
+
+async def test_kb_create_accepts_valid_ocr_model_config(client, user_headers):
+    pid = await _provider_id(client, user_headers)
+    embedding_mid = await _embedding_model_id(client, user_headers, pid)
+    ocr_mid = await _ocr_model_id(client, user_headers, pid)
+    vid = await _vector_db_id(client, user_headers)
+    r = await client.post(
+        "/api/v1/knowledge-bases",
+        json={
+            "name": "kb-with-ocr",
+            "vector_db_config_id": vid,
+            "embedding_model_id": embedding_mid,
+            "retrieval_config": {
+                "multimodal_ingestion": {
+                    "ocr_model_id": ocr_mid,
+                    "languages": ["zh", "en"],
+                    "parse_mode": "auto",
+                }
+            },
+        },
+        headers=user_headers,
+    )
+    assert r.status_code == 201
+    cfg = r.json()["retrieval_config"]["multimodal_ingestion"]
+    assert cfg["ocr_model_id"] == ocr_mid
+    assert cfg["languages"] == ["zh", "en"]
 
 
 async def test_kb_not_found(client, user_headers):

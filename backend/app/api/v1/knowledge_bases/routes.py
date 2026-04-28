@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Body, Depends, File, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user_id, get_session
@@ -121,6 +122,17 @@ async def get_latest_ingestion_job(
     session: AsyncSession = Depends(get_session),
 ) -> IngestionJobRead:
     return await _svc(session, user_id).get_latest_ingestion_job(kb_id, doc_id)
+
+
+@router.get("/{kb_id}/documents/{doc_id}/replay-asset")
+async def get_replay_asset(
+    kb_id: uuid.UUID,
+    doc_id: uuid.UUID,
+    asset_path: str = Query(..., min_length=1),
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> FileResponse:
+    return await _svc(session, user_id).get_replay_asset(kb_id, doc_id, asset_path)
 
 
 @router.get("/{kb_id}/documents/{doc_id}/chunks", response_model=DocumentChunksResponse)
