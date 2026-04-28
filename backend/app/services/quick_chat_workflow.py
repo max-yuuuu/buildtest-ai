@@ -21,6 +21,7 @@ def rewrite_query_once(query: str) -> str:
 
 @dataclass(slots=True)
 class RetrievalAttempt:
+    knowledge_base_id: str
     attempt: int
     query: str
     hit_count: int
@@ -33,7 +34,8 @@ class QuickChatOutput:
     citations: list[dict]
     citation_mappings: list[dict]
     attempts: list[RetrievalAttempt]
-    tool_call: ToolCallResult
+    tool_calls: list[ToolCallResult]
+    errors: list[dict] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -52,7 +54,7 @@ class QuickChatWorkflow:
 
         hits = first_hits
         attempts = [first_attempt]
-        tool_call = first_tool_call
+        tool_calls = [first_tool_call]
         if len(hits) == 0:
             rewritten = rewrite_query_once(normalized)
             second_hits, second_attempt, second_tool_call = await self._retrieve(
@@ -62,7 +64,7 @@ class QuickChatWorkflow:
             )
             attempts.append(second_attempt)
             hits = second_hits
-            tool_call = second_tool_call
+            tool_calls.append(second_tool_call)
 
         context, citations, citation_mappings = self._assemble_context_node(hits)
         answer = self._generate_answer_node(
@@ -75,7 +77,7 @@ class QuickChatWorkflow:
             citations=citations,
             citation_mappings=citation_mappings,
             attempts=attempts,
-            tool_call=tool_call,
+            tool_calls=tool_calls,
         )
 
     async def _retrieve(
@@ -90,6 +92,7 @@ class QuickChatWorkflow:
         return (
             resp.hits,
             RetrievalAttempt(
+                knowledge_base_id=str(knowledge_base_id),
                 attempt=attempt,
                 query=query,
                 hit_count=len(resp.hits),

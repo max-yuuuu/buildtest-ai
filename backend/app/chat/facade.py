@@ -26,11 +26,11 @@ class ChatFacade:
         self._agent_use_case = RunAgentChatUseCase()
         self._data_use_case = RunDataChatUseCase()
 
-    async def run_quick(self, *, knowledge_base_id: uuid.UUID, message: str) -> QuickChatResult:
-        return await self._quick_use_case.execute(knowledge_base_id=knowledge_base_id, message=message)
+    async def run_quick(self, *, knowledge_base_ids: list[uuid.UUID], message: str) -> QuickChatResult:
+        return await self._quick_use_case.execute(knowledge_base_ids=knowledge_base_ids, message=message)
 
-    async def run_agent(self, *, knowledge_base_id: uuid.UUID, message: str) -> QuickChatResult:
-        return await self._agent_use_case.execute(knowledge_base_id=knowledge_base_id, message=message)
+    async def run_agent(self, *, knowledge_base_ids: list[uuid.UUID], message: str) -> QuickChatResult:
+        return await self._agent_use_case.execute(knowledge_base_ids=knowledge_base_ids, message=message)
 
-    async def run_data(self, *, knowledge_base_id: uuid.UUID, message: str) -> QuickChatResult:
-        return await self._data_use_case.execute(knowledge_base_id=knowledge_base_id, message=message)
+    async def run_data(self, *, knowledge_base_ids: list[uuid.UUID], message: str) -> QuickChatResult:
+        return await self._data_use_case.execute(knowledge_base_ids=knowledge_base_ids, message=message)

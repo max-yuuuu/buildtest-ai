@@ -26,6 +26,7 @@ class ChatService:
             citation_mappings=result.citation_mappings,
             attempts=[
                 {
+                    "knowledge_base_id": a.knowledge_base_id,
                     "attempt": a.attempt,
                     "query": a.query,
                     "hit_count": a.hit_count,
@@ -51,13 +52,14 @@ class ChatService:
 
         trace_id = f"trc_{uuid.uuid4().hex[:12]}"
         run_id = f"run_{uuid.uuid4().hex[:12]}"
+        message_id = f"msg_{uuid.uuid4().hex[:12]}"
         started_at = datetime.now(UTC)
 
-        yield self._event("start", trace_id, {"run_id": run_id})
+        yield self._event("start", trace_id, {"run_id": run_id, "message_id": message_id})
         yield self._event(
             "step",
             trace_id,
-            {"id": "step_retrieve", "name": "retrieve", "status": "running"},
+            {"id": "step_retrieve", "name": "retrieve", "status": "running", "message_id": message_id},
         )
 
         try:
@@ -91,8 +93,10 @@ class ChatService:
                 "id": "step_retrieve",
                 "name": "retrieve",
                 "status": "completed",
+                "message_id": message_id,
                 "attempts": [
                     {
+                        "knowledge_base_id": a.knowledge_base_id,
                         "attempt": a.attempt,
                         "query": a.query,
                         "hit_count": a.hit_count,
@@ -102,14 +106,39 @@ class ChatService:
                 ],
             },
         )
+
+        for tool_call in result.tool_calls:
+            yield self._event(
+                "tool-call",
+                trace_id,
+                {
+                    "message_id": message_id,
+                    "tool_call_id": tool_call.trace_meta.get("tool_call_id"),
+                    "tool_name": tool_call.tool_id,
+                    "input": tool_call.input,
+                },
+            )
+            yield self._event(
+                "tool-result",
+                trace_id,
+                {
+                    "message_id": message_id,
+                    "tool_call_id": tool_call.trace_meta.get("tool_call_id"),
+                    "tool_name": tool_call.tool_id,
+                    "output": tool_call.result,
+                },
+            )
+
+        for kb_error in result.errors:
+            yield self._event("error", trace_id, {"message_id": message_id, **kb_error})
         yield self._event(
             "step",
             trace_id,
-            {"id": "step_generate", "name": "generate", "status": "running"},
+            {"id": "step_generate", "name": "generate", "status": "running", "message_id": message_id},
         )
 
         for token in self._iter_tokens(result.answer):
-            yield self._event("token", trace_id, {"text": token})
+            yield self._event("text-delta", trace_id, {"text": token, "message_id": message_id})
 
         for citation in result.citations:
             yield self._event(
@@ -117,6 +146,8 @@ class ChatService:
                 trace_id,
                 {
                     "id": citation.get("citation_id"),
+                    "message_id": message_id,
+                    "knowledge_base_id": self._citation_kb_id(citation, result.citation_mappings),
                     "doc_id": citation.get("document_id"),
                     "chunk_id": citation.get("chunk_index"),
                     "title": citation.get("source", {}).get("section"),
@@ -128,16 +159,18 @@ class ChatService:
         yield self._event(
             "step",
             trace_id,
-            {"id": "step_generate", "name": "generate", "status": "completed"},
+            {"id": "step_generate", "name": "generate", "status": "completed", "message_id": message_id},
         )
         elapsed_ms = int((datetime.now(UTC) - started_at).total_seconds() * 1000)
         yield self._event(
             "done",
             trace_id,
             {
+                "message_id": message_id,
                 "latency_ms": elapsed_ms,
                 "attempts": [
                     {
+                        "knowledge_base_id": a.knowledge_base_id,
                         "attempt": a.attempt,
                         "query": a.query,
                         "hit_count": a.hit_count,
@@ -160,7 +193,7 @@ class ChatService:
         registry.register("api_retrieve", "api", self._api_retrieve_tool)
         registry.set_mode_allowlist("quick", {"api_retrieve"})
         facade = ChatFacade(kb_service=kb_service, tool_registry=registry)
-        return await facade.run_quick(knowledge_base_id=body.knowledge_base_id, message=body.message)
+        return await facade.run_quick(knowledge_base_ids=body.knowledge_base_ids, message=body.message)
 
     async def _run_by_mode(self, body: ChatRequest):
         kb_service = KnowledgeBaseService(self._session, self._user_id)
@@ -172,15 +205,15 @@ class ChatService:
         try:
             if body.mode == "quick":
                 return await facade.run_quick(
-                    knowledge_base_id=body.knowledge_base_id, message=body.message
+                    knowledge_base_ids=body.knowledge_base_ids, message=body.message
                 )
             if body.mode == "agent":
                 return await facade.run_agent(
-                    knowledge_base_id=body.knowledge_base_id, message=body.message
+                    knowledge_base_ids=body.knowledge_base_ids, message=body.message
                 )
             if body.mode == "data":
                 return await facade.run_data(
-                    knowledge_base_id=body.knowledge_base_id, message=body.message
+                    knowledge_base_ids=body.knowledge_base_ids, message=body.message
                 )
         except ModeNotImplementedError as exc:
             raise HTTPException(
@@ -194,7 +227,11 @@ class ChatService:
         )
 
     async def _api_retrieve_tool(self, payload: dict) -> dict:
-        return {"ok": True, "query": payload.get("query"), "kb_id": payload.get("knowledge_base_id")}
+        return {
+            "ok": True,
+            "query": payload.get("query"),
+            "knowledge_base_id": payload.get("knowledge_base_id"),
+        }
 
     @staticmethod
     def _event(event_type: str, trace_id: str, payload: dict) -> dict:
@@ -210,3 +247,11 @@ class ChatService:
         if not text:
             return []
         return [f"{part} " for part in text.split()]
+
+    @staticmethod
+    def _citation_kb_id(citation: dict, citation_mappings: list[dict]) -> str | None:
+        citation_id = citation.get("citation_id")
+        for mapping in citation_mappings:
+            if mapping.get("citation_id") == citation_id:
+                return mapping.get("knowledge_base_id")
+        return None

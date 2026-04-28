@@ -49,6 +49,7 @@ async def test_quick_chat_retries_once_on_empty_results():
     assert out.attempts[1].hit_count == 1
     assert "基于检索结果回答" in out.answer
     assert out.citations[0]["document_id"] == str(doc_id)
+    assert len(out.tool_calls) == 2
 
 
 @pytest.mark.asyncio

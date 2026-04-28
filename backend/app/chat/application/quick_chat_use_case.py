@@ -31,32 +31,53 @@ class RunQuickChatUseCase:
         self._answer_generator = answer_generator
         self._mode = mode
 
-    async def execute(self, *, knowledge_base_id: uuid.UUID, message: str) -> QuickChatResult:
+    async def execute(self, *, knowledge_base_ids: list[uuid.UUID], message: str) -> QuickChatResult:
         normalized = normalize_query(message)
-        hits, attempts, tool_call = await self._retrieve_attempts(
-            knowledge_base_id=knowledge_base_id,
-            normalized_query=normalized,
-        )
+        all_hits: list[RetrieveHit] = []
+        all_attempts: list[RetrievalAttempt] = []
+        all_tool_calls: list[object] = []
+        errors: list[dict] = []
+
+        for knowledge_base_id in knowledge_base_ids:
+            try:
+                hits, attempts, tool_calls = await self._retrieve_attempts(
+                    knowledge_base_id=knowledge_base_id,
+                    normalized_query=normalized,
+                )
+                all_hits.extend(hits)
+                all_attempts.extend(attempts)
+                all_tool_calls.extend(tool_calls)
+            except Exception as exc:
+                errors.append(
+                    {
+                        "knowledge_base_id": str(knowledge_base_id),
+                        "code": "RETRIEVE_FAILED",
+                        "message": str(exc),
+                    }
+                )
+
+        hits = sorted(all_hits, key=lambda hit: hit.score, reverse=True)[:5]
         context, citations, citation_mappings = self._assemble_context(hits)
         answer = self._answer_generator.generate(question=message, context=context, has_hits=len(hits) > 0)
         return QuickChatResult(
             answer=answer,
             citations=citations,
             citation_mappings=citation_mappings,
-            attempts=attempts,
-            tool_call=tool_call,
+            attempts=all_attempts,
+            tool_calls=all_tool_calls,
+            errors=errors,
         )
 
     async def _retrieve_attempts(
         self, *, knowledge_base_id: uuid.UUID, normalized_query: str
-    ) -> tuple[list[RetrieveHit], list[RetrievalAttempt], object]:
+    ) -> tuple[list[RetrieveHit], list[RetrievalAttempt], list[object]]:
         first_hits, first_attempt, first_tool = await self._retrieve_once(
             knowledge_base_id=knowledge_base_id,
             query=normalized_query,
             attempt=1,
         )
         if first_hits:
-            return first_hits, [first_attempt], first_tool
+            return first_hits, [first_attempt], [first_tool]
 
         rewritten = rewrite_query_once(normalized_query)
         second_hits, second_attempt, second_tool = await self._retrieve_once(
@@ -64,7 +85,7 @@ class RunQuickChatUseCase:
             query=rewritten,
             attempt=2,
         )
-        return second_hits, [first_attempt, second_attempt], second_tool
+        return second_hits, [first_attempt, second_attempt], [first_tool, second_tool]
 
     async def _retrieve_once(
         self, *, knowledge_base_id: uuid.UUID, query: str, attempt: int
@@ -74,6 +95,7 @@ class RunQuickChatUseCase:
         )
         hits, latency_ms = await self._retriever.retrieve(knowledge_base_id=knowledge_base_id, query=query)
         attempt_record = RetrievalAttempt(
+            knowledge_base_id=str(knowledge_base_id),
             attempt=attempt,
             query=query,
             hit_count=len(hits),

@@ -7,7 +7,7 @@ from app.chat.domain.models import QuickChatResult
 
 
 class RunAgentChatUseCase:
-    async def execute(self, *, knowledge_base_id: uuid.UUID, message: str) -> QuickChatResult:
-        _ = (knowledge_base_id, message)
+    async def execute(self, *, knowledge_base_ids: list[uuid.UUID], message: str) -> QuickChatResult:
+        _ = (knowledge_base_ids, message)
         raise ModeNotImplementedError("agent")
 

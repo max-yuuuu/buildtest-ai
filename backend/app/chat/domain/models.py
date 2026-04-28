@@ -6,6 +6,7 @@ from typing import Any
 
 @dataclass(slots=True)
 class RetrievalAttempt:
+    knowledge_base_id: str
     attempt: int
     query: str
     hit_count: int
@@ -28,4 +29,5 @@ class QuickChatResult:
     citations: list[dict[str, Any]]
     citation_mappings: list[dict[str, Any]]
     attempts: list[RetrievalAttempt]
-    tool_call: ToolCallRecord | None = None
+    tool_calls: list[ToolCallRecord]
+    errors: list[dict[str, Any]]

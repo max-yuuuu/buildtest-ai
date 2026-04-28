@@ -25,22 +25,31 @@ async def test_chat_stream_event_order_and_single_done():
                 }
             ],
             citation_mappings=[],
-            attempts=[RetrievalAttempt(attempt=1, query="hello", hit_count=1, latency_ms=12)],
-            tool_call=None,  # type: ignore[arg-type]
+            attempts=[
+                RetrievalAttempt(
+                    knowledge_base_id=str(uuid.uuid4()),
+                    attempt=1,
+                    query="hello",
+                    hit_count=1,
+                    latency_ms=12,
+                )
+            ],
+            tool_calls=[],
+            errors=[],
         )
 
     service._run_quick = fake_run_quick  # type: ignore[method-assign]
     events = [
         e
         async for e in service.stream(
-            ChatRequest(message="hello", knowledge_base_id=uuid.uuid4(), mode="quick")
+            ChatRequest(message="hello", knowledge_base_ids=[uuid.uuid4()], mode="quick")
         )
     ]
 
     assert events[0]["type"] == "start"
     assert events[-1]["type"] == "done"
     assert len([e for e in events if e["type"] == "done"]) == 1
-    assert any(e["type"] == "token" for e in events)
+    assert any(e["type"] == "text-delta" for e in events)
     assert any(e["type"] == "citation" for e in events)
 
 
@@ -55,7 +64,7 @@ async def test_chat_stream_terminates_on_error_without_done():
     events = [
         e
         async for e in service.stream(
-            ChatRequest(message="hello", knowledge_base_id=uuid.uuid4(), mode="quick")
+            ChatRequest(message="hello", knowledge_base_ids=[uuid.uuid4()], mode="quick")
         )
     ]
     assert events[-1]["type"] == "error"
@@ -68,7 +77,7 @@ async def test_chat_stream_agent_mode_emits_error_event():
     events = [
         e
         async for e in service.stream(
-            ChatRequest(message="hello", knowledge_base_id=uuid.uuid4(), mode="agent")
+            ChatRequest(message="hello", knowledge_base_ids=[uuid.uuid4()], mode="agent")
         )
     ]
     assert len(events) == 1

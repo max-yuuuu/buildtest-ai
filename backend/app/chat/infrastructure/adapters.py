@@ -38,7 +38,10 @@ class QuickModeToolInvokerAdapter(ToolInvokerPort):
             input=tool_call.input,
             result=tool_call.result,
             latency_ms=tool_call.latency_ms,
-            trace_meta=tool_call.trace_meta,
+            trace_meta={
+                **tool_call.trace_meta,
+                "tool_call_id": f"tool_{uuid.uuid4().hex[:12]}",
+            },
         )
 
 

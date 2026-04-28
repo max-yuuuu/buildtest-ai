@@ -12,7 +12,7 @@ def _payload() -> dict:
     return {
         "mode": "quick",
         "message": "hello",
-        "knowledge_base_id": str(uuid.uuid4()),
+        "knowledge_base_ids": [str(uuid.uuid4())],
     }
 
 
@@ -104,4 +104,4 @@ async def test_quick_chat_stream_tool_exception(client, user_headers, monkeypatc
         events.append(json.loads(data_line[6:]))
 
     assert any(evt["type"] == "error" for evt in events)
-    assert not any(evt["type"] == "done" for evt in events)
+    assert any(evt["type"] == "done" for evt in events)
