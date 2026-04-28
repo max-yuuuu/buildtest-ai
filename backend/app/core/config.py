@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     http_probe_timeout: float = 10.0
     kb_ingestion_notification_timeout_seconds: int = 600
     kb_batch_max_concurrency: int = 3
+    # Optional default OCR route for self-hosted PaddleOCR-like service.
+    # When provider.base_url is empty, caller should still provide model-specific base_url.
+    paddleocr_default_languages: str = "zh,en"
 
 
 settings = Settings()
