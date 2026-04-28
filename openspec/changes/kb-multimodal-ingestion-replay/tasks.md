@@ -1,6 +1,6 @@
 ## 1. Contracts & wiring（先把“能串起来”锁死）
 
-- [ ] 1.1 定义并落地 `source_metadata` 多模态回放契约（block_type/page/bbox_norm/page_image_path/crop_image_path/modality/generator 等），确保 chunks API 与 retrieve API 透传一致
+- [x] 1.1 定义并落地 `source_metadata` 多模态回放契约（block_type/page/bbox_norm/page_image_path/crop_image_path/modality/generator 等），确保 chunks API 与 retrieve API 透传一致
 - [x] 1.2 为派生资源规划 `upload_dir` 目录结构与命名规范（pages/、crops/、中间缓存等），并定义文档删除/重建时的清理策略
 - [x] 1.3 在入库流程中引入“结构化 blocks → chunks”的中间表示（替换/扩展现有 `extract_segments`），并确保空文本/扫描件不再直接失败（走 OCR fallback）
 - [x] 1.4 明确“输入归一化”策略：Office/图片/纯文本 → 统一到 pages（可渲染）与 blocks（可定位），并将归一化产物与原文的血缘写入 `source_metadata.origin`

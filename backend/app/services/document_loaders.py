@@ -24,8 +24,10 @@ def detect_input_kind(file_name: str) -> str:
         return "text"
     if ext == "pdf":
         return "pdf"
-    if ext in ("doc", "docx"):
+    if ext in ("doc", "docx", "ppt", "pptx", "xls", "xlsx"):
         return "office"
+    if ext in ("png", "jpg", "jpeg", "webp", "gif", "bmp", "tiff", "tif"):
+        return "image"
     return "unknown"
 
 
@@ -36,7 +38,9 @@ def infer_normalization_mode(file_name: str) -> str:
     if kind == "pdf":
         return "pdf_to_pages_blocks"
     if kind == "office":
-        return "office_to_text"
+        return "office_to_pages_blocks"
+    if kind == "image":
+        return "image_to_page_block"
     return "unknown"
 
 
@@ -52,14 +56,15 @@ def infer_section_title(text: str) -> str | None:
     return None
 
 
-def _extract_doc_via_libreoffice(data: bytes) -> str:
+def _extract_office_via_libreoffice(data: bytes, suffix: str) -> str:
     soffice_cmd = (
         shutil.which("soffice")
         or shutil.which("libreoffice")
         or "/Applications/LibreOffice.app/Contents/MacOS/soffice"
     )
     with tempfile.TemporaryDirectory() as tmp:
-        src = Path(tmp) / "in.doc"
+        clean_suffix = suffix if suffix.startswith(".") else f".{suffix}"
+        src = Path(tmp) / f"in{clean_suffix}"
         src.write_bytes(data)
         try:
             subprocess.run(
@@ -118,8 +123,8 @@ def extract_text(*, file_name: str, data: bytes) -> str:
                 "请在 Word 中另存为 .docx 后重试"
             ) from e
         return "\n".join(p.text for p in doc.paragraphs if p.text)
-    if ext == "doc":
-        return _extract_doc_via_libreoffice(data)
+    if ext in ("doc", "ppt", "pptx", "xls", "xlsx"):
+        return _extract_office_via_libreoffice(data, ext)
     raise ValueError(f"暂不支持的文件类型: .{ext or '?'}")
 
 

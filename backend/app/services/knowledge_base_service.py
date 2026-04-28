@@ -30,6 +30,7 @@ from app.repositories.model import ModelRepository
 from app.repositories.provider import ProviderRepository
 from app.repositories.vector_db_config import VectorDbConfigRepository
 from app.schemas.knowledge_base import (
+    BBoxNorm,
     BatchUploadResponse,
     DocumentChunkDocumentRead,
     DocumentChunkPaginationRead,
@@ -45,6 +46,9 @@ from app.schemas.knowledge_base import (
     RetrieveHit,
     RetrieveRequest,
     RetrieveResponse,
+    SourceGenerator,
+    SourceMetadata,
+    SourceOrigin,
 )
 from app.services import embedding_client
 from app.services.document_loaders import (
@@ -106,6 +110,70 @@ class ParsedBlock:
     text: str
     modality: str
     generator_impl: str
+    bbox_norm: dict[str, float] | None = None
+    page_image_path: str | None = None
+    crop_image_path: str | None = None
+
+
+def _build_source_generator(
+    *,
+    generator_impl: str,
+    modality: str,
+    config_snapshot: dict | None = None,
+) -> dict | None:
+    generator = SourceGenerator(impl=generator_impl)
+    if modality.startswith("ocr"):
+        generator.capability = "ocr"
+        ocr_model_id = (config_snapshot or {}).get("ocr_model_id")
+        if ocr_model_id:
+            generator.model_id = ocr_model_id
+    payload = generator.model_dump(exclude_none=True)
+    return payload or None
+
+
+def _build_source_metadata(
+    *,
+    doc: Document,
+    block: ParsedBlock,
+    chunk_text: str,
+    parse_trace: dict,
+) -> dict:
+    asset_id = f"asset:{doc.id}:{block.block_id}"
+    section = infer_section_title(chunk_text)
+    bbox = BBoxNorm.model_validate(block.bbox_norm).model_dump() if block.bbox_norm else None
+    metadata = SourceMetadata(
+        page=block.page,
+        section=section,
+        block_type=block.block_type,
+        block_id=block.block_id,
+        asset_id=asset_id,
+        bbox_norm=bbox,
+        page_image_path=block.page_image_path,
+        crop_image_path=block.crop_image_path,
+        modality=block.modality,
+        generator=_build_source_generator(
+            generator_impl=block.generator_impl,
+            modality=block.modality,
+            config_snapshot=parse_trace.get("config_snapshot"),
+        ),
+        origin=SourceOrigin(
+            file_name=doc.file_name,
+            file_type=doc.file_type,
+            storage_path=doc.storage_path,
+            input_kind=parse_trace.get("input_kind"),
+            normalization_mode=parse_trace.get("normalization_mode"),
+            normalized_to=parse_trace.get("normalized_to"),
+        ),
+        context={
+            "parse_trace": parse_trace,
+            "chunk_block_ref": {
+                "document_id": str(doc.id),
+                "block_id": block.block_id,
+                "asset_id": asset_id,
+            },
+        },
+    )
+    return metadata.model_dump(exclude_none=True)
 
 
 def _doc_root_dir(kb_id: uuid.UUID, doc_id: uuid.UUID) -> Path:
@@ -155,7 +223,7 @@ def _looks_binary_bytes(data: bytes) -> bool:
 
 
 def _build_safe_fallback_text(file_name: str, file_bytes: bytes, input_kind: str) -> str:
-    if input_kind in {"pdf", "office"} or _looks_binary_bytes(file_bytes):
+    if input_kind in {"pdf", "office", "image"} or _looks_binary_bytes(file_bytes):
         return (
             f"[OCR_FALLBACK_PENDING] {file_name}\n"
             "Document appears to be binary/scanned content without an extractable text layer yet."
@@ -418,10 +486,11 @@ class KnowledgeBaseService:
                 ParsedBlock(
                     block_id=f"blk-{idx}",
                     block_type="text",
-                    page=seg.page,
+                    page=seg.page or 1,
                     text=seg.text,
                     modality="text",
                     generator_impl="extract_segments",
+                    bbox_norm={"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0},
                 )
                 for idx, seg in enumerate(segments)
                 if seg.text and seg.text.strip()
@@ -429,6 +498,28 @@ class KnowledgeBaseService:
             return blocks, {
                 "mode": "txt",
                 "reason": "text_layer_available",
+                "input_kind": input_kind,
+                "normalization_mode": normalization_mode,
+                "normalized_to": "blocks",
+                "config_snapshot": multimodal_config,
+            }
+
+        if input_kind == "image":
+            fallback_text = _build_safe_fallback_text(file_name, file_bytes, input_kind)
+            blocks = [
+                ParsedBlock(
+                    block_id="blk-image-0",
+                    block_type="image",
+                    page=1,
+                    text=fallback_text,
+                    modality="image",
+                    generator_impl="image.placeholder",
+                    bbox_norm={"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0},
+                )
+            ]
+            return blocks, {
+                "mode": "ocr",
+                "reason": "image_input_placeholder_block",
                 "input_kind": input_kind,
                 "normalization_mode": normalization_mode,
                 "normalized_to": "blocks",
@@ -446,6 +537,7 @@ class KnowledgeBaseService:
                 text=fallback_text,
                 modality="ocr_fallback_pending",
                 generator_impl="fallback.decode_or_placeholder",
+                bbox_norm={"x0": 0.0, "y0": 0.0, "x1": 1.0, "y1": 1.0},
             )
         ]
         return blocks, {
@@ -838,44 +930,16 @@ class KnowledgeBaseService:
             )
             chunks_with_source: list[tuple[str, dict]] = []
             for block in blocks:
-                asset_id = f"asset:{doc.id}:{block.block_id}"
-                config_snapshot = parse_trace.get("config_snapshot", {})
-                generator_meta = {
-                    "impl": block.generator_impl,
-                }
-                if block.modality.startswith("ocr"):
-                    generator_meta["capability"] = "ocr"
-                    if config_snapshot.get("ocr_model_id"):
-                        generator_meta["model_id"] = config_snapshot["ocr_model_id"]
                 for chunk in splitter.split_text(block.text):
                     chunks_with_source.append(
                         (
                             chunk,
-                            {
-                                "page": block.page,
-                                "section": infer_section_title(chunk),
-                                "block_type": block.block_type,
-                                "block_id": block.block_id,
-                                "asset_id": asset_id,
-                                "modality": block.modality,
-                                "generator": generator_meta,
-                                "origin": {
-                                    "file_name": doc.file_name,
-                                    "file_type": doc.file_type,
-                                    "storage_path": doc.storage_path,
-                                    "input_kind": parse_trace.get("input_kind"),
-                                    "normalization_mode": parse_trace.get("normalization_mode"),
-                                    "normalized_to": parse_trace.get("normalized_to"),
-                                },
-                                "context": {
-                                    "parse_trace": parse_trace,
-                                    "chunk_block_ref": {
-                                        "document_id": str(doc.id),
-                                        "block_id": block.block_id,
-                                        "asset_id": asset_id,
-                                    },
-                                },
-                            },
+                            _build_source_metadata(
+                                doc=doc,
+                                block=block,
+                                chunk_text=chunk,
+                                parse_trace=parse_trace,
+                            ),
                         )
                     )
             chunks = [chunk for chunk, _ in chunks_with_source]
