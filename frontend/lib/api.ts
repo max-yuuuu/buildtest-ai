@@ -202,6 +202,8 @@ export const knowledgeBaseApi = {
     request<DocumentChunksResponse>(
       `/knowledge-bases/${kbId}/documents/${docId}/chunks?page=${page}&page_size=${pageSize}`,
     ),
+  getReplayAssetUrl: (kbId: string, docId: string, assetPath: string) =>
+    `${BASE}/knowledge-bases/${kbId}/documents/${docId}/replay-asset?asset_path=${encodeURIComponent(assetPath)}`,
 };
 
 export const notificationApi = {

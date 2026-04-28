@@ -17,6 +17,8 @@ export default function DocumentChunksPage() {
   const docId = params.docId as string;
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [selectedChunkId, setSelectedChunkId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
 
   const chunksQuery = useQuery({
     queryKey: ["knowledge-bases", kbId, "documents", docId, "chunks", page, pageSize],
@@ -55,6 +57,19 @@ export default function DocumentChunksPage() {
   }
 
   const data = chunksQuery.data;
+  const selectedChunk =
+    data.items.find((item) => item.id === selectedChunkId) ??
+    data.items[0] ??
+    null;
+  const selectedSource = selectedChunk?.source ?? {};
+  const pageAssetUrl = selectedSource.page_image_path
+    ? knowledgeBaseApi.getReplayAssetUrl(kbId, docId, selectedSource.page_image_path)
+    : null;
+  const cropAssetUrl = selectedSource.crop_image_path
+    ? knowledgeBaseApi.getReplayAssetUrl(kbId, docId, selectedSource.crop_image_path)
+    : null;
+  const bbox = selectedSource.bbox_norm;
+
   return (
     <div className="space-y-4 p-4 lg:p-5">
       <div className="flex items-center justify-between">
@@ -77,33 +92,112 @@ export default function DocumentChunksPage() {
           暂无可展示分块数据
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border bg-card">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-xs text-muted-foreground">
-              <tr>
-                <th className="px-4 py-2 text-left font-medium">Chunk #</th>
-                <th className="px-4 py-2 text-left font-medium">预览文本</th>
-                <th className="px-4 py-2 text-left font-medium">字符长度</th>
-                <th className="px-4 py-2 text-left font-medium">Token 长度</th>
-                <th className="px-4 py-2 text-left font-medium">页码</th>
-                <th className="px-4 py-2 text-left font-medium">章节</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((item) => (
-                <tr key={item.id} className="border-t align-top">
-                  <td className="px-4 py-2.5">{item.chunk_index}</td>
-                  <td className="max-w-xl truncate px-4 py-2.5" title={item.preview_text ?? ""}>
-                    {item.preview_text ?? "（无预览）"}
-                  </td>
-                  <td className="px-4 py-2.5">{item.char_length ?? "-"}</td>
-                  <td className="px-4 py-2.5">{item.token_length ?? "-"}</td>
-                  <td className="px-4 py-2.5">{String(item.source?.page ?? "-")}</td>
-                  <td className="px-4 py-2.5">{String(item.source?.section ?? "-")}</td>
+        <div className="grid gap-4 lg:grid-cols-5">
+          <div className="overflow-hidden rounded-xl border bg-card lg:col-span-3">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium">Chunk #</th>
+                  <th className="px-4 py-2 text-left font-medium">预览文本</th>
+                  <th className="px-4 py-2 text-left font-medium">字符长度</th>
+                  <th className="px-4 py-2 text-left font-medium">Token 长度</th>
+                  <th className="px-4 py-2 text-left font-medium">页码</th>
+                  <th className="px-4 py-2 text-left font-medium">章节</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.items.map((item) => (
+                  <tr
+                    key={item.id}
+                    className={`cursor-pointer border-t align-top ${
+                      selectedChunk?.id === item.id ? "bg-primary/5" : ""
+                    }`}
+                    onClick={() => setSelectedChunkId(item.id)}
+                  >
+                    <td className="px-4 py-2.5">{item.chunk_index}</td>
+                    <td className="max-w-xl truncate px-4 py-2.5" title={item.preview_text ?? ""}>
+                      {item.preview_text ?? "（无预览）"}
+                    </td>
+                    <td className="px-4 py-2.5">{item.char_length ?? "-"}</td>
+                    <td className="px-4 py-2.5">{item.token_length ?? "-"}</td>
+                    <td className="px-4 py-2.5">{String(item.source?.page ?? "-")}</td>
+                    <td className="px-4 py-2.5">{String(item.source?.section ?? "-")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="space-y-3 rounded-xl border bg-card p-3 lg:col-span-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium">回放面板</h3>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setZoom((v) => Math.max(0.5, Number((v - 0.1).toFixed(2))))}
+                >
+                  -
+                </Button>
+                <span className="w-10 text-center text-xs">{Math.round(zoom * 100)}%</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setZoom((v) => Math.min(2, Number((v + 0.1).toFixed(2))))}
+                >
+                  +
+                </Button>
+              </div>
+            </div>
+
+            <div className="text-xs text-muted-foreground">
+              block_type: {selectedSource.block_type ?? "-"} · modality:{" "}
+              {selectedSource.modality ?? "-"} · generator: {selectedSource.generator?.impl ?? "-"}
+            </div>
+
+            <div className="max-h-[420px] overflow-auto rounded border bg-muted/20 p-2">
+              {pageAssetUrl ? (
+                <div className="relative inline-block" style={{ transform: `scale(${zoom})`, transformOrigin: "top left" }}>
+                  <img
+                    src={pageAssetUrl}
+                    alt="page replay"
+                    className="h-auto max-w-full rounded"
+                  />
+                  {bbox ? (
+                    <div
+                      className="pointer-events-none absolute border-2 border-red-500"
+                      style={{
+                        left: `${bbox.x0 * 100}%`,
+                        top: `${bbox.y0 * 100}%`,
+                        width: `${Math.max(0, bbox.x1 - bbox.x0) * 100}%`,
+                        height: `${Math.max(0, bbox.y1 - bbox.y0) * 100}%`,
+                      }}
+                    />
+                  ) : null}
+                </div>
+              ) : (
+                <div className="p-4 text-xs text-muted-foreground">当前 chunk 无 page_image 资源</div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-xs font-medium">Crop 预览</div>
+              {cropAssetUrl ? (
+                <img src={cropAssetUrl} alt="crop replay" className="max-h-40 rounded border object-contain" />
+              ) : (
+                <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
+                  当前 chunk 无 crop_image 资源
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1 text-xs">
+              <div className="font-medium">多模态字段</div>
+              <div className="rounded bg-muted/40 p-2 text-muted-foreground">
+                {(selectedChunk?.preview_text ?? "").slice(0, 300) || "无 OCR/caption/table_md/latex 展示内容"}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

@@ -204,8 +204,28 @@ export interface DocumentChunkItem {
   char_length: number;
   token_length: number | null;
   preview_text: string | null;
-  source: Record<string, unknown>;
+  source: SourceMetadata;
   created_at: string;
+}
+
+export interface SourceMetadata {
+  page?: number | null;
+  section?: string | null;
+  block_type?: "text" | "image" | "table" | "equation" | null;
+  block_id?: string | null;
+  asset_id?: string | null;
+  bbox_norm?: { x0: number; y0: number; x1: number; y1: number } | null;
+  page_image_path?: string | null;
+  crop_image_path?: string | null;
+  modality?: string | null;
+  generator?: {
+    capability?: string | null;
+    provider_id?: string | null;
+    model_id?: string | null;
+    impl?: string | null;
+  } | null;
+  origin?: Record<string, unknown> | null;
+  context?: Record<string, unknown> | null;
 }
 
 export interface DocumentChunksResponse {
