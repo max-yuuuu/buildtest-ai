@@ -71,7 +71,7 @@ export default function DocumentChunksPage() {
   const bbox = selectedSource.bbox_norm;
 
   return (
-    <div className="space-y-4 p-4 lg:p-5">
+    <div className="flex h-[calc(100dvh-5.5rem)] flex-col gap-4 overflow-hidden p-4 lg:p-5">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">{data.document.name || "未命名文档"}</h2>
@@ -92,10 +92,11 @@ export default function DocumentChunksPage() {
           暂无可展示分块数据
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-5">
-          <div className="overflow-hidden rounded-xl border bg-card lg:col-span-3">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-xs text-muted-foreground">
+        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-5">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border bg-card lg:col-span-3">
+            <div className="min-h-0 flex-1 overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-muted/40 text-xs text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2 text-left font-medium">Chunk #</th>
                   <th className="px-4 py-2 text-left font-medium">预览文本</th>
@@ -104,31 +105,32 @@ export default function DocumentChunksPage() {
                   <th className="px-4 py-2 text-left font-medium">页码</th>
                   <th className="px-4 py-2 text-left font-medium">章节</th>
                 </tr>
-              </thead>
-              <tbody>
-                {data.items.map((item) => (
-                  <tr
-                    key={item.id}
-                    className={`cursor-pointer border-t align-top ${
-                      selectedChunk?.id === item.id ? "bg-primary/5" : ""
-                    }`}
-                    onClick={() => setSelectedChunkId(item.id)}
-                  >
-                    <td className="px-4 py-2.5">{item.chunk_index}</td>
-                    <td className="max-w-xl truncate px-4 py-2.5" title={item.preview_text ?? ""}>
-                      {item.preview_text ?? "（无预览）"}
-                    </td>
-                    <td className="px-4 py-2.5">{item.char_length ?? "-"}</td>
-                    <td className="px-4 py-2.5">{item.token_length ?? "-"}</td>
-                    <td className="px-4 py-2.5">{String(item.source?.page ?? "-")}</td>
-                    <td className="px-4 py-2.5">{String(item.source?.section ?? "-")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.items.map((item) => (
+                    <tr
+                      key={item.id}
+                      className={`cursor-pointer border-t align-top ${
+                        selectedChunk?.id === item.id ? "bg-primary/5" : ""
+                      }`}
+                      onClick={() => setSelectedChunkId(item.id)}
+                    >
+                      <td className="px-4 py-2.5">{item.chunk_index}</td>
+                      <td className="max-w-xl truncate px-4 py-2.5" title={item.preview_text ?? ""}>
+                        {item.preview_text ?? "（无预览）"}
+                      </td>
+                      <td className="px-4 py-2.5">{item.char_length ?? "-"}</td>
+                      <td className="px-4 py-2.5">{item.token_length ?? "-"}</td>
+                      <td className="px-4 py-2.5">{String(item.source?.page ?? "-")}</td>
+                      <td className="px-4 py-2.5">{String(item.source?.section ?? "-")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div className="space-y-3 rounded-xl border bg-card p-3 lg:col-span-2">
+          <div className="flex min-h-0 flex-col gap-3 rounded-xl border bg-card p-3 lg:col-span-2">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium">回放面板</h3>
               <div className="flex items-center gap-1">
@@ -155,53 +157,58 @@ export default function DocumentChunksPage() {
               {selectedSource.modality ?? "-"} · generator: {selectedSource.generator?.impl ?? "-"}
             </div>
 
-            <div className="max-h-[420px] overflow-auto rounded border bg-muted/20 p-2">
-              {pageAssetUrl ? (
-                <div className="relative inline-block" style={{ transform: `scale(${zoom})`, transformOrigin: "top left" }}>
-                  <img
-                    src={pageAssetUrl}
-                    alt="page replay"
-                    className="h-auto max-w-full rounded"
-                  />
-                  {bbox ? (
-                    <div
-                      className="pointer-events-none absolute border-2 border-red-500"
-                      style={{
-                        left: `${bbox.x0 * 100}%`,
-                        top: `${bbox.y0 * 100}%`,
-                        width: `${Math.max(0, bbox.x1 - bbox.x0) * 100}%`,
-                        height: `${Math.max(0, bbox.y1 - bbox.y0) * 100}%`,
-                      }}
+            <div className="flex min-h-0 flex-1 flex-col gap-3">
+              <div className="min-h-0 flex-1 overflow-auto rounded border bg-muted/20 p-2">
+                {pageAssetUrl ? (
+                  <div className="relative inline-block" style={{ transform: `scale(${zoom})`, transformOrigin: "top left" }}>
+                    <img
+                      src={pageAssetUrl}
+                      alt="page replay"
+                      className="h-auto max-w-full rounded"
                     />
-                  ) : null}
-                </div>
-              ) : (
-                <div className="p-4 text-xs text-muted-foreground">当前 chunk 无 page_image 资源</div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-xs font-medium">Crop 预览</div>
-              {cropAssetUrl ? (
-                <img src={cropAssetUrl} alt="crop replay" className="max-h-40 rounded border object-contain" />
-              ) : (
-                <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
-                  当前 chunk 无 crop_image 资源
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-1 text-xs">
-              <div className="font-medium">多模态字段</div>
-              <div className="rounded bg-muted/40 p-2 text-muted-foreground">
-                {(selectedChunk?.preview_text ?? "").slice(0, 300) || "无 OCR/caption/table_md/latex 展示内容"}
+                    {bbox ? (
+                      <div
+                        className="pointer-events-none absolute border-2 border-red-500"
+                        style={{
+                          left: `${bbox.x0 * 100}%`,
+                          top: `${bbox.y0 * 100}%`,
+                          width: `${Math.max(0, bbox.x1 - bbox.x0) * 100}%`,
+                          height: `${Math.max(0, bbox.y1 - bbox.y0) * 100}%`,
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="p-4 text-xs text-muted-foreground">当前 chunk 无 page_image 资源</div>
+                )}
               </div>
+
+              <div className="space-y-2">
+                <div className="text-xs font-medium">Crop 预览</div>
+                {cropAssetUrl ? (
+                  <div className="max-h-44 overflow-auto rounded border bg-muted/20 p-2">
+                    <img src={cropAssetUrl} alt="crop replay" className="h-auto w-full object-contain" />
+                  </div>
+                ) : (
+                  <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
+                    当前 chunk 无 crop_image 资源
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1 text-xs">
+                <div className="font-medium">多模态字段</div>
+                <div className="max-h-28 overflow-auto rounded bg-muted/40 p-2 text-muted-foreground">
+                  {(selectedChunk?.preview_text ?? "").slice(0, 300) || "无 OCR/caption/table_md/latex 展示内容"}
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
       )}
 
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+      <div className="flex shrink-0 items-center justify-between text-xs text-muted-foreground">
         <span>
           第 {data.pagination.page} / {data.pagination.total_pages} 页 · 共 {data.pagination.total} 条
         </span>
