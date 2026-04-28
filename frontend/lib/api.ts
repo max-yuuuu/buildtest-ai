@@ -155,6 +155,13 @@ export const knowledgeBaseApi = {
     kbId: string,
     files: File[],
   ): Promise<BatchUploadResponse> => {
+    if (files.length === 1) {
+      const doc = await knowledgeBaseApi.uploadDocument(kbId, files[0]);
+      return {
+        created_count: 1,
+        documents: [doc],
+      };
+    }
     const fd = new FormData();
     files.forEach((f) => fd.append("files", f));
     const res = await fetch(`${BASE}/knowledge-bases/${kbId}/documents/batch`, {

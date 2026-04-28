@@ -70,6 +70,21 @@ function pickGradient(id: string) {
   return KB_GRADIENTS[sum % KB_GRADIENTS.length];
 }
 
+function getMultimodalSummary(kb: KnowledgeBase) {
+  const retrievalConfig = (kb.retrieval_config ?? {}) as Record<string, unknown>;
+  const multimodal = (retrievalConfig.multimodal_ingestion ?? {}) as Record<string, unknown>;
+  return {
+    ocrModelId:
+      typeof multimodal.ocr_model_id === "string" ? multimodal.ocr_model_id : null,
+    parseMode:
+      typeof multimodal.parse_mode === "string" ? multimodal.parse_mode : "auto",
+    languages: Array.isArray(multimodal.languages)
+      ? multimodal.languages.filter((v): v is string => typeof v === "string")
+      : [],
+    enableVlm: Boolean(multimodal.enable_vlm),
+  };
+}
+
 export default function KnowledgeBasesPage() {
   const qc = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
@@ -78,6 +93,7 @@ export default function KnowledgeBasesPage() {
   const [vectorDbId, setVectorDbId] = useState("");
   const [providerId, setProviderId] = useState("");
   const [embeddingModelId, setEmbeddingModelId] = useState("");
+  const [ocrModelId, setOcrModelId] = useState("");
 
   const { data: kbs, isLoading, error } = useQuery({
     queryKey: ["knowledge-bases"],
@@ -109,6 +125,10 @@ export default function KnowledgeBasesPage() {
     () => (models ?? []).filter((m: Model) => m.model_type === "embedding"),
     [models],
   );
+  const ocrModels = useMemo(
+    () => (models ?? []).filter((m: Model) => m.model_type === "ocr"),
+    [models],
+  );
   const activeProviders = useMemo(
     () => (providers ?? []).filter((p: Provider) => p.is_active),
     [providers],
@@ -132,6 +152,11 @@ export default function KnowledgeBasesPage() {
         vector_db_config_id: vectorDbId,
         embedding_model_id: embeddingModelId,
         retrieval_similarity_threshold: 0.4,
+        retrieval_config: {
+          multimodal_ingestion: {
+            ocr_model_id: ocrModelId || null,
+          },
+        },
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["knowledge-bases"] });
@@ -141,6 +166,7 @@ export default function KnowledgeBasesPage() {
       setVectorDbId("");
       setProviderId("");
       setEmbeddingModelId("");
+      setOcrModelId("");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -285,6 +311,25 @@ export default function KnowledgeBasesPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>OCR 模型 <span className="text-xs text-muted-foreground">(可选)</span></Label>
+              <Select
+                value={ocrModelId}
+                onValueChange={setOcrModelId}
+                disabled={!providerId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择已登记的 OCR 模型" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ocrModels.map((m: Model) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.model_id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
@@ -418,6 +463,7 @@ function KnowledgeBaseCard({
 }) {
   const meta = pickGradient(kb.id);
   const detailHref = `/knowledge-bases/${kb.id}` as Route;
+  const multimodal = getMultimodalSummary(kb);
   return (
     <div
       className={cn(
@@ -491,6 +537,16 @@ function KnowledgeBaseCard({
             <span className="text-xs text-muted-foreground">
               top_k {kb.retrieval_top_k} · 阈值{" "}
               {kb.retrieval_similarity_threshold}
+            </span>
+          </Row>
+          <Row icon={<Sparkles className="h-3.5 w-3.5" />} label="多模态">
+            <span className="text-xs text-muted-foreground">
+              OCR {multimodal.ocrModelId ? "已配置" : "未配置"} ·
+              模式 {multimodal.parseMode}
+              {multimodal.languages.length > 0
+                ? ` · ${multimodal.languages.join("/")}`
+                : ""}
+              {multimodal.enableVlm ? " · VLM 开" : ""}
             </span>
           </Row>
         </div>
