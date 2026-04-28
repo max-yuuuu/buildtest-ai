@@ -18,6 +18,19 @@ vi.mock("ai", () => ({
   },
 }));
 
+vi.mock("streamdown", () => ({
+  Streamdown: ({ children }: { children: string }) =>
+    children.startsWith("# ") ? <h1>{children.slice(2)}</h1> : <div>{children}</div>,
+}));
+
+vi.mock("@streamdown/code", () => ({
+  code: {},
+}));
+
+vi.mock("@streamdown/mermaid", () => ({
+  mermaid: {},
+}));
+
 vi.mock("@ai-sdk/react", () => ({
   useChat: () => ({
     messages: [
@@ -25,8 +38,9 @@ vi.mock("@ai-sdk/react", () => ({
         id: "assistant-1",
         role: "assistant",
         parts: [
-          { type: "text", text: "hello" },
-          { type: "data-citation", data: { citation_id: "c1" } },
+          { type: "text", text: "# hello" },
+          { type: "data-step", data: { step_kind: "retrieve", status: "running" } },
+          { type: "data-citation", data: { citation_id: "c1", title: "Postgres Docs", knowledge_base_id: "kb-default" } },
           {
             type: "tool-retrieve_knowledge",
             toolCallId: "tool_1",
@@ -34,6 +48,7 @@ vi.mock("@ai-sdk/react", () => ({
             input: { query: "postgres" },
             output: { hit_count: 2 },
           },
+          { type: "data-error", data: { message: "检索部分失败" } },
         ],
       },
     ],
@@ -114,7 +129,7 @@ describe("ChatPage", () => {
     });
   });
 
-  it("渲染 text / data / tool parts", async () => {
+  it("默认阅读视图只显示正文、状态、来源和友好错误", async () => {
     vi.spyOn(knowledgeBaseApi, "list").mockResolvedValue([
       {
         id: "kb-default",
@@ -143,10 +158,14 @@ describe("ChatPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("hello")).toBeInTheDocument();
-      expect(screen.getByText(/citation_id/)).toBeInTheDocument();
-      expect(screen.getByText(/Tool tool_1/)).toBeInTheDocument();
-      expect(screen.getByText(/output-available/)).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "hello" })).toBeInTheDocument();
+      expect(screen.getByText("正在检索知识库...")).toBeInTheDocument();
+      expect(screen.getByText("引用来源 1")).toBeInTheDocument();
+      expect(screen.getByText("Postgres Docs")).toBeInTheDocument();
+      expect(screen.getByText("检索部分失败")).toBeInTheDocument();
+      expect(screen.queryByText(/citation_id/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Tool tool_1/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/output-available/)).not.toBeInTheDocument();
     });
   });
 });

@@ -16,22 +16,11 @@ import {
   insertMention,
   stripMentionTokens,
 } from "@/lib/chat-mentions";
+import { AssistantMarkdownMessage } from "@/components/chat/assistant-markdown-message";
+import { ChatCitationList } from "@/components/chat/chat-citation-list";
+import { ChatStatusLine } from "@/components/chat/chat-status-line";
+import { normalizeChatMessage } from "@/lib/chat-message-view-model";
 import { cn } from "@/lib/utils";
-
-type ChatPart = Record<string, unknown> & {
-  type?: string;
-  text?: string;
-  data?: Record<string, unknown>;
-  state?: string;
-  input?: unknown;
-  output?: unknown;
-  toolCallId?: string;
-};
-
-function collectParts(message: unknown): ChatPart[] {
-  const m = message as { parts?: ChatPart[] };
-  return Array.isArray(m.parts) ? m.parts : [];
-}
 
 export default function ChatPage() {
   const { data: kbs = [] } = useQuery({
@@ -144,8 +133,8 @@ export default function ChatPage() {
             {messages.map((msg) => {
               const id = (msg as { id: string }).id;
               const role = (msg as { role: string }).role;
-              const parts = collectParts(msg);
               const isUser = role === "user";
+              const view = normalizeChatMessage(msg as { id: string; role: string; parts?: Record<string, unknown>[] });
 
               return (
                 <div key={id} className={cn("flex gap-3", isUser ? "justify-end" : "justify-start")}>
@@ -165,59 +154,15 @@ export default function ChatPage() {
                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground/80">
                       {role === "user" ? "You" : role === "assistant" ? "Assistant" : role}
                     </div>
-                    {parts.map((part, i) => {
-                      if (part.type === "text") {
-                        return <p key={`${id}-text-${i}`}>{part.text}</p>;
-                      }
-
-                      if (part.type === "data-citation" || part.type === "data-step") {
-                        return (
-                          <pre
-                            key={`${id}-${part.type}-${i}`}
-                            className="rounded-md bg-background/80 p-2 text-[11px] text-muted-foreground"
-                          >
-                            {JSON.stringify(part.data, null, 2)}
-                          </pre>
-                        );
-                      }
-
-                      if (part.type === "data-error") {
-                        return (
-                          <pre
-                            key={`${id}-${part.type}-${i}`}
-                            className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-[11px]"
-                          >
-                            {JSON.stringify(part.data, null, 2)}
-                          </pre>
-                        );
-                      }
-
-                      if (part.type?.startsWith("tool-")) {
-                        return (
-                          <div
-                            key={`${id}-${part.type}-${i}`}
-                            className="rounded-md border bg-background/80 p-2 text-[11px] text-muted-foreground"
-                          >
-                            <div className="font-medium text-foreground">
-                              Tool {String(part.toolCallId ?? "")}
-                            </div>
-                            <div>state: {String(part.state ?? "unknown")}</div>
-                            {"input" in part ? (
-                              <pre className="mt-1 whitespace-pre-wrap">
-                                {JSON.stringify(part.input, null, 2)}
-                              </pre>
-                            ) : null}
-                            {"output" in part ? (
-                              <pre className="mt-1 whitespace-pre-wrap">
-                                {JSON.stringify(part.output, null, 2)}
-                              </pre>
-                            ) : null}
-                          </div>
-                        );
-                      }
-
-                      return null;
-                    })}
+                    {isUser ? <p>{view.markdownText}</p> : null}
+                    {!isUser ? <ChatStatusLine text={view.statusText} /> : null}
+                    {!isUser ? <AssistantMarkdownMessage markdown={view.markdownText} isStreaming={isStreaming} /> : null}
+                    {!isUser ? <ChatCitationList citations={view.citations} /> : null}
+                    {!isUser && view.errorText ? (
+                      <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                        {view.errorText}
+                      </div>
+                    ) : null}
                   </div>
                   {isUser && (
                     <Avatar className="size-8">

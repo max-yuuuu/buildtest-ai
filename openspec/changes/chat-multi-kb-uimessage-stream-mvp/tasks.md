@@ -43,7 +43,7 @@
 - [x] 6.1 补充前端单测：`@KB` 解析、默认主知识库兜底、tool/data parts 渲染
 - [x] 6.2 补充后端单测：`knowledge_base_ids[]` 请求契约、多库合并检索、tool 事件、局部错误不中断
 - [x] 6.3 补充 BFF/契约测试：Python 领域事件到 AI SDK 6 UI stream chunks 的映射正确性
-- [ ] 6.4 验证 `ai@6 latest` 在 host 前端与 Docker 前端中的依赖解析与 chat 行为一致
-- [ ] 6.5 校验 Docker 开发环境与 host 开发环境都能通过同一路径 `/api/chat` 正常完成流式请求
-- [ ] 6.6 至少完成一次 host 环境与 Docker 环境的端到端验证，确认二者行为一致
+- [x] 6.4 验证 `ai@6 latest` 在 host 前端与 Docker 前端中的依赖解析与 chat 行为一致
+- [x] 6.5 校验 Docker 开发环境与 host 开发环境都能通过同一路径 `/api/chat` 正常完成流式请求
+- [x] 6.6 至少完成一次 host 环境与 Docker 环境的端到端验证，确认二者行为一致
 

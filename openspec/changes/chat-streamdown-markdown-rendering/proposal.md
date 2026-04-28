@@ -29,7 +29,7 @@
 ### Modified Capabilities
 
 - `quick-chat-ui`: 从直接渲染 raw parts 改为按正文、状态、来源分层渲染。
-- `chat-part-rendering-contract`: 保持协议不变，但默认阅读视图不再直接展示 raw tool/raw step/raw citation JSON。
+- `chat-default-reading-view`: 保持协议不变，但默认阅读视图不再直接展示 raw tool/raw step/raw citation JSON。
 
 ## Impact
 
