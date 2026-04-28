@@ -19,6 +19,7 @@ def test_build_source_generator_records_ocr_model_lineage():
     assert payload["impl"] == "paddleocr"
     assert payload["capability"] == "ocr"
     assert "model_id" in payload
+    assert isinstance(payload["model_id"], str)
 
 
 def test_build_source_metadata_produces_multimodal_replay_contract():
@@ -65,6 +66,7 @@ def test_build_source_metadata_produces_multimodal_replay_contract():
     assert payload["crop_image_path"] == "derived/crops/blk-1.png"
     assert payload["modality"] == "ocr_text"
     assert payload["generator"]["capability"] == "ocr"
+    assert isinstance(payload["generator"]["model_id"], str)
     assert payload["origin"]["file_name"] == "scan.pdf"
     assert payload["origin"]["input_kind"] == "pdf"
     assert payload["context"]["chunk_block_ref"]["block_id"] == "blk-1"

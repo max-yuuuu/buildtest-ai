@@ -60,8 +60,8 @@ async def _vector_db_id(client, headers):
 
 @pytest.fixture
 def fake_embed(monkeypatch):
-    async def _embed(*, provider_type, api_key, base_url, model_id, texts):
-        _ = (provider_type, api_key, base_url, model_id)
+    async def _embed(*, provider_type, api_key, base_url, model_id, texts, batch_size=None):
+        _ = (provider_type, api_key, base_url, model_id, batch_size)
         return [[0.5, 0.5, 0.5, 0.5] for _ in texts]
 
     monkeypatch.setattr(
@@ -550,3 +550,270 @@ async def test_ingestion_retry_updates_attempt_count(client, user_headers, monke
     assert retry_res.status_code == 200
     assert retry_res.json()["status"] == "queued"
     assert retry_res.json()["attempt_count"] >= 2
+
+
+async def test_replay_lineage_consistency_between_chunks_and_retrieve(
+    client, user_headers, fake_embed, monkeypatch, session
+):
+    import pathlib
+    from types import SimpleNamespace
+
+    from sqlalchemy import select
+
+    from app.models.document import Document
+    from app.models.kb_vector_chunk import KbVectorChunk
+
+    root = "/tmp/buildtest-uploads-test-lineage"
+    pathlib.Path(root).mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(
+        "app.services.knowledge_base_service.settings",
+        SimpleNamespace(upload_dir=root, upload_max_size_mb=50),
+    )
+    monkeypatch.setattr(
+        "app.tasks.ingestion.process_document_ingestion_task.delay",
+        lambda *args, **kwargs: None,
+    )
+
+    pid = await _provider_id(client, user_headers)
+    mid = await _embedding_model_id(client, user_headers, pid)
+    vid = await _vector_db_id(client, user_headers)
+    kb_res = await client.post(
+        "/api/v1/knowledge-bases",
+        json={
+            "name": "lineage-consistency-kb",
+            "vector_db_config_id": vid,
+            "embedding_model_id": mid,
+        },
+        headers=user_headers,
+    )
+    assert kb_res.status_code == 201
+    kb_id = kb_res.json()["id"]
+
+    upload_res = await client.post(
+        f"/api/v1/knowledge-bases/{kb_id}/documents",
+        headers=user_headers,
+        files={"file": ("scan.txt", io.BytesIO(b"scan-like"), "text/plain")},
+    )
+    assert upload_res.status_code == 201
+    doc_id = upload_res.json()["id"]
+    doc_uuid = uuid.UUID(doc_id)
+    doc_row = (await session.execute(select(Document).where(Document.id == doc_uuid))).scalar_one()
+    doc_row.status = "completed"
+    source = {
+        "page": 1,
+        "block_type": "image",
+        "block_id": "blk-1",
+        "asset_id": f"asset:{doc_id}:blk-1",
+        "bbox_norm": {"x0": 0.1, "y0": 0.1, "x1": 0.6, "y1": 0.8},
+        "page_image_path": "derived/pages/page-0001.png",
+        "crop_image_path": "derived/crops/blk-1.png",
+        "modality": "ocr_text",
+    }
+    session.add(
+        KbVectorChunk(
+            knowledge_base_id=uuid.UUID(kb_id),
+            document_id=doc_uuid,
+            chunk_index=0,
+            content_hash="c" * 64,
+            text="ocr text content",
+            embedding=[0.2, 0.2, 0.2, 0.2],
+            source_metadata=source,
+        )
+    )
+    await session.commit()
+
+    chunks_res = await client.get(
+        f"/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}/chunks",
+        headers=user_headers,
+    )
+    assert chunks_res.status_code == 200
+    chunk_source = chunks_res.json()["items"][0]["source"]
+
+    retrieve_res = await client.post(
+        f"/api/v1/knowledge-bases/{kb_id}/retrieve",
+        headers=user_headers,
+        json={"query": "ocr"},
+    )
+    assert retrieve_res.status_code == 200
+    hit_source = retrieve_res.json()["hits"][0]["source"]
+    assert hit_source["asset_id"] == chunk_source["asset_id"]
+    assert hit_source["block_id"] == chunk_source["block_id"]
+    assert hit_source["page_image_path"] == chunk_source["page_image_path"]
+
+
+async def test_replay_asset_cleanup_and_cross_tenant_isolation(client, user_headers, monkeypatch):
+    import pathlib
+    from types import SimpleNamespace
+
+    root = "/tmp/buildtest-uploads-test-replay-assets"
+    pathlib.Path(root).mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(
+        "app.services.knowledge_base_service.settings",
+        SimpleNamespace(upload_dir=root, upload_max_size_mb=50),
+    )
+    monkeypatch.setattr(
+        "app.tasks.ingestion.process_document_ingestion_task.delay",
+        lambda *args, **kwargs: None,
+    )
+
+    pid = await _provider_id(client, user_headers)
+    mid = await _embedding_model_id(client, user_headers, pid)
+    vid = await _vector_db_id(client, user_headers)
+    kb_res = await client.post(
+        "/api/v1/knowledge-bases",
+        json={
+            "name": "asset-cleanup-kb",
+            "vector_db_config_id": vid,
+            "embedding_model_id": mid,
+        },
+        headers=user_headers,
+    )
+    assert kb_res.status_code == 201
+    kb_id = kb_res.json()["id"]
+    upload_res = await client.post(
+        f"/api/v1/knowledge-bases/{kb_id}/documents",
+        headers=user_headers,
+        files={"file": ("note.txt", io.BytesIO(b"abc"), "text/plain")},
+    )
+    assert upload_res.status_code == 201
+    doc_id = upload_res.json()["id"]
+
+    page_dir = pathlib.Path(root) / kb_id / doc_id / "derived" / "pages"
+    page_dir.mkdir(parents=True, exist_ok=True)
+    page_path = page_dir / "page-0001.png"
+    page_path.write_bytes(
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDAT\x08\x99c```\x00\x00"
+        b"\x00\x04\x00\x01\xa3'\xa4\x9b\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+
+    own_res = await client.get(
+        f"/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}/replay-asset",
+        headers=user_headers,
+        params={"asset_path": "derived/pages/page-0001.png"},
+    )
+    assert own_res.status_code == 200
+
+    another_user_headers = {
+        "X-User-Id": f"github:{uuid.uuid4()}",
+        "X-User-Email": "other@example.com",
+        "X-User-Name": "Other User",
+    }
+    forbidden = await client.get(
+        f"/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}/replay-asset",
+        headers=another_user_headers,
+        params={"asset_path": "derived/pages/page-0001.png"},
+    )
+    assert forbidden.status_code == 404
+
+    delete_res = await client.delete(
+        f"/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}",
+        headers=user_headers,
+    )
+    assert delete_res.status_code == 204
+    assert not page_path.exists()
+
+
+async def test_ingestion_timeout_smoke_and_retry_after_failure(
+    client, user_headers, fake_embed, monkeypatch, session
+):
+    import pathlib
+    from types import SimpleNamespace
+
+    from app.repositories.user import UserRepository
+    from app.services.knowledge_base_service import KnowledgeBaseService
+
+    root = "/tmp/buildtest-uploads-test-timeout-smoke"
+    pathlib.Path(root).mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(
+        "app.services.knowledge_base_service.settings",
+        SimpleNamespace(
+            upload_dir=root,
+            upload_max_size_mb=50,
+            kb_ingestion_notification_timeout_seconds=1,
+        ),
+    )
+    monkeypatch.setattr(
+        "app.tasks.ingestion.process_document_ingestion_task.delay",
+        lambda *args, **kwargs: None,
+    )
+
+    pid = await _provider_id(client, user_headers)
+    mid = await _embedding_model_id(client, user_headers, pid)
+    vid = await _vector_db_id(client, user_headers)
+
+    kb_res = await client.post(
+        "/api/v1/knowledge-bases",
+        json={
+            "name": "timeout-smoke-kb",
+            "vector_db_config_id": vid,
+            "embedding_model_id": mid,
+        },
+        headers=user_headers,
+    )
+    assert kb_res.status_code == 201
+    kb_id = kb_res.json()["id"]
+
+    upload_res = await client.post(
+        f"/api/v1/knowledge-bases/{kb_id}/documents",
+        headers=user_headers,
+        files={"file": ("note.txt", io.BytesIO(b"timeout smoke"), "text/plain")},
+    )
+    assert upload_res.status_code == 201
+    doc_id = upload_res.json()["id"]
+
+    job_res = await client.get(
+        f"/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}/ingestion-job",
+        headers=user_headers,
+    )
+    assert job_res.status_code == 200
+    job_id = job_res.json()["id"]
+
+    # Resolve internal user UUID created by deps.
+    external_id = user_headers["X-User-Id"]
+    user_row = await UserRepository(session).get_by_external_id(external_id)
+    assert user_row is not None
+    svc = KnowledgeBaseService(session, user_row.id)
+
+    # Patch ingestion to force a failure quickly (so we can test retry),
+    # and patch perf_counter to simulate long runtime so timeout notice is emitted.
+    import app.services.knowledge_base_service as kb_mod
+
+    perf_state = {"calls": 0}
+
+    def _fake_perf_counter() -> float:
+        perf_state["calls"] += 1
+        return 0.0 if perf_state["calls"] == 1 else 2.2
+
+    monkeypatch.setattr(kb_mod.time, "perf_counter", _fake_perf_counter)
+
+    timeout_calls = {"count": 0}
+    original_timeout = svc.notification_service.publish_ingestion_timeout
+
+    async def _timeout_wrapper(**kwargs):
+        timeout_calls["count"] += 1
+        return await original_timeout(**kwargs)
+
+    monkeypatch.setattr(svc.notification_service, "publish_ingestion_timeout", _timeout_wrapper)
+
+    async def _force_fail(_kb, doc, _bytes):
+        doc.status = "failed"
+        doc.error_message = "forced failure"
+        await session.commit()
+
+    monkeypatch.setattr(svc, "_ingest_document", _force_fail)
+
+    await svc.process_document_ingestion(
+        uuid.UUID(kb_id),
+        uuid.UUID(doc_id),
+        uuid.UUID(job_id),
+    )
+    assert timeout_calls["count"] >= 1
+
+    # Retry should still work after a failed + timed out run.
+    retry_res = await client.post(
+        f"/api/v1/knowledge-bases/{kb_id}/documents/{doc_id}/ingestion-job/retry",
+        headers=user_headers,
+    )
+    assert retry_res.status_code == 200
+    assert retry_res.json()["status"] == "queued"
