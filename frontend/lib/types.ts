@@ -1,4 +1,4 @@
-export type ProviderType = "openai" | "anthropic" | "azure" | "zhipu" | "qwen";
+export type ProviderType = "openai" | "anthropic" | "azure" | "zhipu" | "qwen" | "ollama";
 
 export interface Provider {
   id: string;

@@ -112,6 +112,16 @@ require_cmd() {
   fi
 }
 
+ensure_backend_deps() {
+  require_cmd uv
+  (
+    cd "${ROOT_DIR}/backend"
+    # This project currently pins runtime deps in requirements.txt (not pyproject).
+    # Ensure uv's environment has them before running alembic/uvicorn/celery.
+    uv pip install -r requirements.txt >/dev/null
+  )
+}
+
 docker_infra() {
   require_cmd docker
   docker compose -f "$INFRA_COMPOSE_FILE" up -d
@@ -136,7 +146,7 @@ cmd_print_env() {
 cmd_backend() {
   ensure_profile_file backend-host
   load_env_profiles backend-host
-  require_cmd uv
+  ensure_backend_deps
   (
     cd "${ROOT_DIR}/backend"
     uv run alembic upgrade head
@@ -147,7 +157,7 @@ cmd_backend() {
 cmd_worker() {
   ensure_profile_file backend-host
   load_env_profiles backend-host
-  require_cmd uv
+  ensure_backend_deps
   (
     cd "${ROOT_DIR}/backend"
     exec uv run celery -A app.core.celery_app worker -l info
@@ -215,6 +225,7 @@ cmd_up() {
 
   load_env_profiles backend-host frontend-host
   cmd_print_env
+  ensure_backend_deps
 
   local backend_pid=""
   local worker_pid=""

@@ -36,7 +36,17 @@ const PROVIDER_TYPES: ProviderType[] = [
   "azure",
   "zhipu",
   "qwen",
+  "ollama",
 ];
+
+const BASE_URL_PLACEHOLDER: Record<ProviderType, string> = {
+  openai: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com/v1",
+  azure: "https://{resource}.openai.azure.com",
+  zhipu: "https://open.bigmodel.cn/api/paas/v4",
+  qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  ollama: "http://localhost:11434",
+};
 
 const buildSchema = (isEdit: boolean) =>
   z.object({
@@ -47,10 +57,21 @@ const buildSchema = (isEdit: boolean) =>
       "azure",
       "zhipu",
       "qwen",
+      "ollama",
     ] as const),
-    api_key: isEdit ? z.string().optional() : z.string().min(1, "必填"),
+    api_key: z.string().optional().or(z.literal("")),
     base_url: z.string().url().optional().or(z.literal("")),
     is_active: z.boolean(),
+  }).superRefine((val, ctx) => {
+    if (isEdit) return;
+    if (val.provider_type === "ollama") return;
+    if (!val.api_key) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["api_key"],
+        message: "必填",
+      });
+    }
   });
 
 type FormValues = z.infer<ReturnType<typeof buildSchema>>;
@@ -77,6 +98,9 @@ export function ProviderFormDialog({ open, onOpenChange, initial }: Props) {
       is_active: true,
     },
   });
+  const providerType = form.watch("provider_type");
+  const baseUrlPlaceholder = BASE_URL_PLACEHOLDER[providerType];
+  const apiKeyRequired = !isEdit && providerType !== "ollama";
 
   useEffect(() => {
     if (open) {
@@ -103,11 +127,10 @@ export function ProviderFormDialog({ open, onOpenChange, initial }: Props) {
         const updated = await providerApi.update(initial.id, update);
         return { provider: updated, isCreate: false };
       }
-      // create 分支 schema 已经强制 api_key 非空,断言给 TS
       const created = await providerApi.create({
         name: values.name,
         provider_type: values.provider_type,
-        api_key: values.api_key as string,
+        api_key: values.api_key || "",
         base_url,
         is_active: values.is_active,
       });
@@ -196,23 +219,33 @@ export function ProviderFormDialog({ open, onOpenChange, initial }: Props) {
 
           <div className="space-y-1">
             <Label htmlFor="api_key">
-              API Key {isEdit && <span className="text-xs text-muted-foreground">(留空则不修改)</span>}
+              API Key
+              {isEdit ? (
+                <span className="text-xs text-muted-foreground">(留空则不修改)</span>
+              ) : providerType === "ollama" ? (
+                <span className="text-xs text-muted-foreground">(可选)</span>
+              ) : null}
             </Label>
             <Input
               id="api_key"
               type="password"
               autoComplete="off"
               {...form.register("api_key", {
-                required: isEdit ? false : "必填",
+                required: apiKeyRequired ? "必填" : false,
               })}
             />
+            {form.formState.errors.api_key && (
+              <p className="text-xs text-destructive">
+                {form.formState.errors.api_key.message as string}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1">
             <Label htmlFor="base_url">Base URL(可选)</Label>
             <Input
               id="base_url"
-              placeholder="https://api.openai.com/v1"
+              placeholder={baseUrlPlaceholder}
               {...form.register("base_url")}
             />
             {form.formState.errors.base_url && (

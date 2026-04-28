@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 
 from fastapi import HTTPException
@@ -215,6 +216,8 @@ class ModelService:
 def _infer_model_type(model_id: str) -> str:
     """按 model_id 前缀/子串推断类型。保守策略:只识别明确含 embedding 的,其余默认 llm。"""
     lower = model_id.lower()
-    if "embedding" in lower or lower.startswith("embed-") or lower.endswith("-embed"):
+    # Treat "embed" as a token (e.g. nomic-embed-text:latest). Keep conservative to
+    # avoid matching unrelated words like "embedded".
+    if "embedding" in lower or re.search(r"(^|[-_/])embed(ding)?($|[-_:/])", lower) is not None:
         return "embedding"
     return "llm"

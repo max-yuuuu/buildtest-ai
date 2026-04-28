@@ -74,6 +74,12 @@ const PROVIDER_META: Record<
     ring: "ring-rose-500/20",
     initial: "QW",
   },
+  ollama: {
+    label: "Ollama",
+    gradient: "from-gray-400 via-slate-500 to-zinc-600",
+    ring: "ring-gray-500/20",
+    initial: "OL",
+  },
 };
 
 export default function ProvidersPage() {
@@ -464,7 +470,7 @@ function AddProviderCard({ onClick }: { onClick: () => void }) {
       </div>
       <span className="font-medium">接入新 Provider</span>
       <span className="text-xs text-muted-foreground/80">
-        OpenAI · Anthropic · Azure · 智谱 · 通义
+        OpenAI · Anthropic · Azure · 智谱 · 通义 · Ollama
       </span>
     </button>
   );
