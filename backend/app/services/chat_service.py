@@ -7,6 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.chat import ChatFacade
 from app.chat.domain import ModeNotImplementedError
+from app.chat.domain.models import RetrievalAttempt, ToolCallRecord
+from app.chat.graphs.quick_chat_graph import astream_quick_graph
+from app.chat.infrastructure.adapters import (
+    KnowledgeBaseRetrieverAdapter,
+    QuickModeToolInvokerAdapter,
+    TemplateAnswerGeneratorAdapter,
+)
+from app.chat.application.quick_chat_use_case import rewrite_query_once
+from app.schemas.knowledge_base import RetrieveHit
 from app.schemas.chat import ChatAcceptedResponse, ChatRequest
 from app.services.chat_tool_registry import ToolRegistry
 from app.services.knowledge_base_service import KnowledgeBaseService
@@ -56,14 +65,24 @@ class ChatService:
         started_at = datetime.now(UTC)
 
         yield self._event("start", trace_id, {"run_id": run_id, "message_id": message_id})
-        yield self._event(
-            "step",
-            trace_id,
-            {"id": "step_retrieve", "name": "retrieve", "status": "running", "message_id": message_id},
-        )
-
         try:
-            result = await self._run_quick(body)
+            async for graph_evt in self._stream_quick_graph_events(body):
+                if graph_evt["type"] == "step":
+                    yield self._event(
+                        "step",
+                        trace_id,
+                        {
+                            "id": f"step_{graph_evt['name']}",
+                            "name": graph_evt["name"],
+                            "status": graph_evt["status"],
+                            "message_id": message_id,
+                        },
+                    )
+                    continue
+                result = graph_evt["result"]
+                break
+            else:
+                raise RuntimeError("graph did not return result")
         except HTTPException as exc:
             detail = exc.detail
             if isinstance(detail, dict):
@@ -85,27 +104,6 @@ class ChatService:
                 {"code": "CHAT_INTERNAL_ERROR", "message": str(exc), "retryable": False},
             )
             return
-
-        yield self._event(
-            "step",
-            trace_id,
-            {
-                "id": "step_retrieve",
-                "name": "retrieve",
-                "status": "completed",
-                "message_id": message_id,
-                "attempts": [
-                    {
-                        "knowledge_base_id": a.knowledge_base_id,
-                        "attempt": a.attempt,
-                        "query": a.query,
-                        "hit_count": a.hit_count,
-                        "latency_ms": a.latency_ms,
-                    }
-                    for a in result.attempts
-                ],
-            },
-        )
 
         for tool_call in result.tool_calls:
             yield self._event(
@@ -131,12 +129,6 @@ class ChatService:
 
         for kb_error in result.errors:
             yield self._event("error", trace_id, {"message_id": message_id, **kb_error})
-        yield self._event(
-            "step",
-            trace_id,
-            {"id": "step_generate", "name": "generate", "status": "running", "message_id": message_id},
-        )
-
         for token in self._iter_tokens(result.answer):
             yield self._event("text-delta", trace_id, {"text": token, "message_id": message_id})
 
@@ -158,11 +150,6 @@ class ChatService:
                 },
             )
 
-        yield self._event(
-            "step",
-            trace_id,
-            {"id": "step_generate", "name": "generate", "status": "completed", "message_id": message_id},
-        )
         elapsed_ms = int((datetime.now(UTC) - started_at).total_seconds() * 1000)
         yield self._event(
             "done",
@@ -196,6 +183,77 @@ class ChatService:
         registry.set_mode_allowlist("quick", {"api_retrieve"})
         facade = ChatFacade(kb_service=kb_service, tool_registry=registry)
         return await facade.run_quick(knowledge_base_ids=body.knowledge_base_ids, message=body.message)
+
+    async def _stream_quick_graph_events(self, body: ChatRequest) -> AsyncIterator[dict]:
+        kb_service = KnowledgeBaseService(self._session, self._user_id)
+        registry = ToolRegistry()
+        registry.register("api_retrieve", "api", self._api_retrieve_tool)
+        registry.set_mode_allowlist("quick", {"api_retrieve"})
+
+        retriever = KnowledgeBaseRetrieverAdapter(kb_service)
+        tool_invoker = QuickModeToolInvokerAdapter(registry)
+        answer_generator = TemplateAnswerGeneratorAdapter()
+
+        async def retrieve_attempts(
+            knowledge_base_id: uuid.UUID,
+            normalized_query: str,
+        ) -> tuple[list[RetrieveHit], list[RetrievalAttempt], list[ToolCallRecord]]:
+            first_hits, first_attempt, first_tool = await self._retrieve_once_for_stream(
+                retriever=retriever,
+                tool_invoker=tool_invoker,
+                knowledge_base_id=knowledge_base_id,
+                query=normalized_query,
+                attempt=1,
+            )
+            if first_hits:
+                return first_hits, [first_attempt], [first_tool]
+
+            rewritten = rewrite_query_once(normalized_query)
+            second_hits, second_attempt, second_tool = await self._retrieve_once_for_stream(
+                retriever=retriever,
+                tool_invoker=tool_invoker,
+                knowledge_base_id=knowledge_base_id,
+                query=rewritten,
+                attempt=2,
+            )
+            return second_hits, [first_attempt, second_attempt], [first_tool, second_tool]
+
+        async for graph_evt in astream_quick_graph(
+            message=body.message,
+            knowledge_base_ids=body.knowledge_base_ids,
+            retriever=lambda _kb_id, _query: [],
+            answer_generator=lambda question, context, has_hits: answer_generator.generate(
+                question=question,
+                context=context,
+                has_hits=has_hits,
+            ),
+            retrieve_attempts=retrieve_attempts,
+        ):
+            yield graph_evt
+
+    async def _retrieve_once_for_stream(
+        self,
+        *,
+        retriever: KnowledgeBaseRetrieverAdapter,
+        tool_invoker: QuickModeToolInvokerAdapter,
+        knowledge_base_id: uuid.UUID,
+        query: str,
+        attempt: int,
+    ) -> tuple[list[RetrieveHit], RetrievalAttempt, ToolCallRecord]:
+        tool_call = await tool_invoker.invoke_retrieve_tool(
+            mode="quick",
+            knowledge_base_id=knowledge_base_id,
+            query=query,
+        )
+        hits, latency_ms = await retriever.retrieve(knowledge_base_id=knowledge_base_id, query=query)
+        attempt_record = RetrievalAttempt(
+            knowledge_base_id=str(knowledge_base_id),
+            attempt=attempt,
+            query=query,
+            hit_count=len(hits),
+            latency_ms=latency_ms,
+        )
+        return hits, attempt_record, tool_call
 
     async def _run_by_mode(self, body: ChatRequest):
         kb_service = KnowledgeBaseService(self._session, self._user_id)
