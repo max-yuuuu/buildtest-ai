@@ -9,6 +9,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.chat.domain.models import QuickChatResult, RetrievalAttempt, ToolCallRecord
 from app.chat.domain.ports import AnswerGeneratorPort, KnowledgeRetrieverPort, ToolInvokerPort
+from app.chat.infrastructure.external_tool_adapter import ExternalToolAdapter
 from app.schemas.knowledge_base import RetrieveHit
 
 
@@ -94,6 +95,7 @@ def _build_agent_graph(
     retriever: KnowledgeRetrieverPort,
     tool_invoker: ToolInvokerPort,
     answer_generator: AnswerGeneratorPort,
+    external_tool_adapter: ExternalToolAdapter | None = None,
 ):
     async def normalize_node(state: _AgentState) -> dict[str, Any]:
         return {"normalized_query": _normalize_query(state["message"])}
@@ -138,6 +140,11 @@ def _build_agent_graph(
                 )
                 tool_calls.append(tool_call)
                 all_hits.extend(hits)
+                if external_tool_adapter is not None:
+                    await external_tool_adapter.call(
+                        tool_name="langflow.run",
+                        payload={"query": query, "knowledge_base_id": str(kb_id)},
+                    )
             except Exception as exc:
                 errors.append(
                     {
@@ -186,9 +193,15 @@ async def run_agent_graph(
     retriever: KnowledgeRetrieverPort,
     tool_invoker: ToolInvokerPort,
     answer_generator: AnswerGeneratorPort,
+    external_tool_adapter: ExternalToolAdapter | None = None,
     max_iters: int = 3,
 ) -> QuickChatResult:
-    graph = _build_agent_graph(retriever=retriever, tool_invoker=tool_invoker, answer_generator=answer_generator)
+    graph = _build_agent_graph(
+        retriever=retriever,
+        tool_invoker=tool_invoker,
+        answer_generator=answer_generator,
+        external_tool_adapter=external_tool_adapter,
+    )
     state = await graph.ainvoke(_initial_state(message=message, knowledge_base_ids=knowledge_base_ids, max_iters=max_iters))
     return _state_to_result(state)
 
@@ -200,9 +213,15 @@ async def astream_agent_graph(
     retriever: KnowledgeRetrieverPort,
     tool_invoker: ToolInvokerPort,
     answer_generator: AnswerGeneratorPort,
+    external_tool_adapter: ExternalToolAdapter | None = None,
     max_iters: int = 3,
 ) -> AsyncIterator[dict[str, Any]]:
-    graph = _build_agent_graph(retriever=retriever, tool_invoker=tool_invoker, answer_generator=answer_generator)
+    graph = _build_agent_graph(
+        retriever=retriever,
+        tool_invoker=tool_invoker,
+        answer_generator=answer_generator,
+        external_tool_adapter=external_tool_adapter,
+    )
     output_state: dict[str, Any] | None = None
     step_nodes = {"think", "tool_call", "finalize"}
 

@@ -71,6 +71,24 @@ describe("chat route event mapping", () => {
 
     expect(mapBackendEventToUiMessageChunkSse({ type: "citation", message_id: "msg_1", citation_id: "c1" }, state))
       .toEqual(['data: {"type":"data-citation","data":{"type":"citation","message_id":"msg_1","citation_id":"c1"}}\n\n']);
+
+    expect(
+      mapBackendEventToUiMessageChunkSse(
+        { type: "step", message_id: "msg_1", id: "step_think", name: "think", status: "running" },
+        state,
+      ),
+    ).toEqual([
+      'data: {"type":"data-step","data":{"type":"step","message_id":"msg_1","id":"step_think","name":"think","status":"running"}}\n\n',
+    ]);
+
+    expect(
+      mapBackendEventToUiMessageChunkSse(
+        { type: "error", message_id: "msg_1", code: "CHAT_INTERNAL_ERROR", message: "boom" },
+        state,
+      ),
+    ).toEqual([
+      'data: {"type":"data-error","data":{"type":"error","message_id":"msg_1","code":"CHAT_INTERNAL_ERROR","message":"boom"}}\n\n',
+    ]);
   });
 });
 
