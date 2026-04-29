@@ -82,12 +82,39 @@ async def test_chat_stream_terminates_on_error_without_done():
 @pytest.mark.asyncio
 async def test_chat_stream_agent_mode_emits_error_event():
     service = ChatService(session=None, user_id=uuid.uuid4())  # type: ignore[arg-type]
+
+    async def fake_stream_agent_graph_events(_body):  # noqa: ANN001
+        yield {"type": "step", "name": "think", "status": "running"}
+        yield {"type": "step", "name": "think", "status": "completed"}
+        yield {"type": "step", "name": "tool_call", "status": "running"}
+        yield {"type": "step", "name": "tool_call", "status": "completed"}
+        yield {
+            "type": "result",
+            "result": QuickChatOutput(
+                answer="agent answer",
+                citations=[],
+                citation_mappings=[],
+                attempts=[
+                    RetrievalAttempt(
+                        knowledge_base_id=str(uuid.uuid4()),
+                        attempt=1,
+                        query="hello",
+                        hit_count=0,
+                        latency_ms=10,
+                    )
+                ],
+                tool_calls=[],
+                errors=[],
+            ),
+        }
+
+    service._stream_agent_graph_events = fake_stream_agent_graph_events  # type: ignore[method-assign]
     events = [
         e
         async for e in service.stream(
             ChatRequest(message="hello", knowledge_base_ids=[uuid.uuid4()], mode="agent")
         )
     ]
-    assert len(events) == 1
-    assert events[0]["type"] == "error"
-    assert events[0]["code"] == "MODE_NOT_IMPLEMENTED"
+    assert events[0]["type"] == "start"
+    assert events[-1]["type"] == "done"
+    assert any(e["type"] == "text-delta" for e in events)

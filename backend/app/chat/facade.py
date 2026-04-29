@@ -23,7 +23,12 @@ class ChatFacade:
             answer_generator=TemplateAnswerGeneratorAdapter(),
             mode="quick",
         )
-        self._agent_use_case = RunAgentChatUseCase()
+        self._agent_use_case = RunAgentChatUseCase(
+            retriever=KnowledgeBaseRetrieverAdapter(kb_service),
+            tool_invoker=QuickModeToolInvokerAdapter(tool_registry),
+            answer_generator=TemplateAnswerGeneratorAdapter(),
+            max_iters=3,
+        )
         self._data_use_case = RunDataChatUseCase()
 
     async def run_quick(self, *, knowledge_base_ids: list[uuid.UUID], message: str) -> QuickChatResult:
