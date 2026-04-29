@@ -55,8 +55,9 @@ async function* parseSse(reader: ReadableStreamDefaultReader<Uint8Array>): Async
   let buffer = "";
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+    if (value) {
+      buffer += decoder.decode(value, { stream: true });
+    }
     const blocks = buffer.split("\n\n");
     buffer = blocks.pop() ?? "";
     for (const block of blocks) {
@@ -72,6 +73,7 @@ async function* parseSse(reader: ReadableStreamDefaultReader<Uint8Array>): Async
         continue;
       }
     }
+    if (done) break;
   }
 }
 
@@ -115,12 +117,21 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       const reader = upstream.body!.getReader();
       const state = createChatStreamMappingState();
-      for await (const event of parseSse(reader)) {
-        for (const line of mapBackendEventToUiMessageChunkSse(event, state)) {
-          controller.enqueue(encoder.encode(line));
+      try {
+        for await (const event of parseSse(reader)) {
+          for (const line of mapBackendEventToUiMessageChunkSse(event, state)) {
+            controller.enqueue(encoder.encode(line));
+          }
         }
+      } catch (err) {
+        console.error("SSE stream error:", err);
+      } finally {
+        if (state.textStarted && !state.finished) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "text-end", id: state.textId })}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "finish" })}\n\n`));
+        }
+        controller.close();
       }
-      controller.close();
     },
   });
 

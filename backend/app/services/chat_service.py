@@ -141,6 +141,8 @@ class ChatService:
             yield self._event("text-delta", trace_id, {"text": token, "message_id": message_id})
 
         for citation in result.citations:
+            source = citation.get("source")
+            title = source.section if isinstance(source, object) and hasattr(source, "section") else None
             yield self._event(
                 "citation",
                 trace_id,
@@ -150,7 +152,7 @@ class ChatService:
                     "knowledge_base_id": self._citation_kb_id(citation, result.citation_mappings),
                     "doc_id": citation.get("document_id"),
                     "chunk_id": citation.get("chunk_index"),
-                    "title": citation.get("source", {}).get("section"),
+                    "title": title,
                     "snippet": "",
                     "score": citation.get("score"),
                 },
