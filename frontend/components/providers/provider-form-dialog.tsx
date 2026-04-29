@@ -38,6 +38,7 @@ const PROVIDER_TYPES: ProviderType[] = [
   "qwen",
   "ollama",
 ];
+const HIDDEN_CREATE_PROVIDER_TYPES: ProviderType[] = ["anthropic", "azure"];
 
 const BASE_URL_PLACEHOLDER: Record<ProviderType, string> = {
   openai: "https://api.openai.com/v1",
@@ -99,6 +100,11 @@ export function ProviderFormDialog({ open, onOpenChange, initial }: Props) {
     },
   });
   const providerType = form.watch("provider_type");
+  const selectableProviderTypes = isEdit
+    ? PROVIDER_TYPES
+    : PROVIDER_TYPES.filter(
+        (type) => !HIDDEN_CREATE_PROVIDER_TYPES.includes(type),
+      );
   const baseUrlPlaceholder = BASE_URL_PLACEHOLDER[providerType];
   const apiKeyRequired = !isEdit && providerType !== "ollama";
 
@@ -208,7 +214,7 @@ export function ProviderFormDialog({ open, onOpenChange, initial }: Props) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {PROVIDER_TYPES.map((t) => (
+                {selectableProviderTypes.map((t) => (
                   <SelectItem key={t} value={t}>
                     {t}
                   </SelectItem>

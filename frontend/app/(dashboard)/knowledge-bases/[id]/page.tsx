@@ -72,6 +72,7 @@ export default function KnowledgeBaseDetailPage() {
   const id = params.id as string;
   const qc = useQueryClient();
   const formInit = useRef(false);
+  const ocrProviderInit = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const failedToastSentRef = useRef<Set<string>>(new Set());
 
@@ -117,6 +118,7 @@ export default function KnowledgeBaseDetailPage() {
 
   useEffect(() => {
     formInit.current = false;
+    ocrProviderInit.current = false;
   }, [id]);
 
   useEffect(() => {
@@ -131,6 +133,36 @@ export default function KnowledgeBaseDetailPage() {
     setThreshold(String(kb.retrieval_similarity_threshold));
     setOcrModelId(multimodal.ocrModelId);
   }, [kb]);
+
+  // 回填 OCR Provider：UI 里 OCR 模型下拉框依赖 providerId 过滤模型列表，
+  // 而后端只在 retrieval_config 里保存 ocr_model_id（provider 可从 model.provider_id 派生）。
+  useEffect(() => {
+    if (!kb || !providers) return;
+    if (providerId) return; // 已回填/已手动选择
+    if (ocrProviderInit.current) return;
+
+    const desiredOcrModelId = getMultimodalConfig(kb).ocrModelId;
+    if (!desiredOcrModelId) return;
+
+    ocrProviderInit.current = true;
+    (async () => {
+      try {
+        const active = (providers ?? []).filter((p: Provider) => p.is_active);
+        const found = await Promise.all(
+          active.map(async (p: Provider) => {
+            const ms = await modelApi.list(p.id);
+            return { provider: p, models: ms };
+          }),
+        ).then((all) =>
+          all.find((x) => x.models.some((m: Model) => m.id === desiredOcrModelId)),
+        );
+
+        if (found) setProviderId(found.provider.id);
+      } catch {
+        ocrProviderInit.current = false;
+      }
+    })();
+  }, [kb, providers, providerId]);
 
   useEffect(() => {
     if (!docs) return;

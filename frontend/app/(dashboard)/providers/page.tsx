@@ -470,7 +470,7 @@ function AddProviderCard({ onClick }: { onClick: () => void }) {
       </div>
       <span className="font-medium">接入新 Provider</span>
       <span className="text-xs text-muted-foreground/80">
-        OpenAI · Anthropic · Azure · 智谱 · 通义 · Ollama
+        OpenAI · 智谱 · 通义 · Ollama
       </span>
     </button>
   );
