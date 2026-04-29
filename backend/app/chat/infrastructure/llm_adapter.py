@@ -12,7 +12,13 @@ class ResolvedModel:
 
 
 class ModelConfigSource(Protocol):
-    async def get_llm_model_for_mode(self, *, user_id: uuid.UUID, mode: str) -> ResolvedModel | None: ...
+    async def get_llm_model_for_mode(
+        self,
+        *,
+        user_id: uuid.UUID,
+        mode: str,
+        knowledge_base_ids: list[uuid.UUID] | None = None,
+    ) -> ResolvedModel | None: ...
 
 
 class LLMAdapter:
@@ -25,7 +31,13 @@ class LLMAdapter:
         self._config_source = config_source
         self._default_model = default_model or ResolvedModel(provider="openai", model_name="default")
 
-    async def resolve(self, *, mode: str, user_id: uuid.UUID) -> ResolvedModel:
-        configured = await self._config_source.get_llm_model_for_mode(user_id=user_id, mode=mode)
+    async def resolve(
+        self, *, mode: str, user_id: uuid.UUID, knowledge_base_ids: list[uuid.UUID] | None = None
+    ) -> ResolvedModel:
+        configured = await self._config_source.get_llm_model_for_mode(
+            user_id=user_id,
+            mode=mode,
+            knowledge_base_ids=knowledge_base_ids,
+        )
         return configured or self._default_model
 

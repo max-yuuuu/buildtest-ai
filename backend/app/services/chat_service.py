@@ -14,6 +14,8 @@ from app.chat.infrastructure.adapters import (
     QuickModeToolInvokerAdapter,
     TemplateAnswerGeneratorAdapter,
 )
+from app.chat.infrastructure.llm_adapter import LLMAdapter, ResolvedModel
+from app.chat.infrastructure.model_config_source import DbModelConfigSource
 from app.chat.application.quick_chat_use_case import rewrite_query_once
 from app.schemas.knowledge_base import RetrieveHit
 from app.schemas.chat import ChatAcceptedResponse, ChatRequest
@@ -63,8 +65,20 @@ class ChatService:
         run_id = f"run_{uuid.uuid4().hex[:12]}"
         message_id = f"msg_{uuid.uuid4().hex[:12]}"
         started_at = datetime.now(UTC)
+        selected_model = await self._resolve_model_for_request(body)
 
-        yield self._event("start", trace_id, {"run_id": run_id, "message_id": message_id})
+        yield self._event(
+            "start",
+            trace_id,
+            {
+                "run_id": run_id,
+                "message_id": message_id,
+                "model": {
+                    "provider": selected_model.provider,
+                    "model_name": selected_model.model_name,
+                },
+            },
+        )
         try:
             stream_fn = (
                 self._stream_agent_graph_events if body.mode == "agent" else self._stream_quick_graph_events
@@ -291,6 +305,7 @@ class ChatService:
         return hits, attempt_record, tool_call
 
     async def _run_by_mode(self, body: ChatRequest):
+        _ = await self._resolve_model_for_request(body)
         kb_service = KnowledgeBaseService(self._session, self._user_id)
         registry = ToolRegistry()
         registry.register("api_retrieve", "api", self._api_retrieve_tool)
@@ -319,6 +334,18 @@ class ChatService:
         raise HTTPException(
             status_code=422,
             detail={"code": "INVALID_MODE", "message": f"invalid chat mode `{body.mode}`"},
+        )
+
+    async def _resolve_model_for_request(self, body: ChatRequest) -> ResolvedModel:
+        # unit tests stub ChatService with session=None; keep deterministic default in that case.
+        if self._session is None:
+            return ResolvedModel(provider="openai", model_name="default")
+        source = DbModelConfigSource(session=self._session, user_id=self._user_id)
+        adapter = LLMAdapter(config_source=source)
+        return await adapter.resolve(
+            mode=body.mode,
+            user_id=self._user_id,
+            knowledge_base_ids=body.knowledge_base_ids,
         )
 
     async def _api_retrieve_tool(self, payload: dict) -> dict:

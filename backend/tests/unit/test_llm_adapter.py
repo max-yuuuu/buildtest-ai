@@ -9,8 +9,8 @@ class _FakeConfigSource:
     def __init__(self, resolved: ResolvedModel | None) -> None:
         self._resolved = resolved
 
-    async def get_llm_model_for_mode(self, *, user_id, mode):  # noqa: ANN001
-        _ = (user_id, mode)
+    async def get_llm_model_for_mode(self, *, user_id, mode, knowledge_base_ids=None):  # noqa: ANN001
+        _ = (user_id, mode, knowledge_base_ids)
         return self._resolved
 
 
