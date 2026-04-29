@@ -60,7 +60,10 @@ async def embed_texts(
     texts: list[str],
     batch_size: int | None = None,
 ) -> list[list[float]]:
-    if provider_type not in ("openai", "azure", "ollama"):
+    # Phase 1: only support OpenAI-compatible embedding APIs.
+    # `qwen`/`zhipu` are also registered as OpenAI-compatible endpoints in this app.
+    provider_type = provider_type.strip().lower()
+    if provider_type not in ("openai", "azure", "ollama", "zhipu", "qwen"):
         raise EmbeddingError(f"embedding 尚未支持 provider_type={provider_type}")
 
     if provider_type == "ollama":

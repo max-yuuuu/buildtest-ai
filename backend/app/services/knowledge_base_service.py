@@ -1330,6 +1330,9 @@ class KnowledgeBaseService:
     async def _ingest_document(self, kb: KnowledgeBase, doc: Document, file_bytes: bytes) -> None:
         if kb.embedding_model_id is None:
             raise HTTPException(status_code=500, detail="knowledge base missing embedding model")
+        # Cache ids up-front to avoid any ORM lazy-load during error handling.
+        kb_id = kb.id
+        doc_id = doc.id
         vdbc = await self._get_vdbc(kb.vector_db_config_id)
         conn = vector_connector_for_config(vdbc, self.session)
         key = _collection_key(kb, vdbc.db_type)
@@ -1445,8 +1448,8 @@ class KnowledgeBaseService:
             logger.exception(
                 "ingestion_failed",
                 extra={
-                    "kb_id": str(doc.knowledge_base_id),
-                    "doc_id": str(doc.id),
+                    "kb_id": str(kb_id),
+                    "doc_id": str(doc_id),
                     "error": _sanitize_error_message(str(e)),
                     "error_type": type(e).__name__,
                 },
