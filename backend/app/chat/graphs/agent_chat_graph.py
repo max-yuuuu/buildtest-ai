@@ -241,7 +241,9 @@ async def astream_agent_graph(
             event_name == "on_chain_end"
             and isinstance(data, dict)
             and isinstance(data.get("output"), dict)
-            and "answer" in data["output"]
+            and {"answer", "citations", "citation_mappings", "attempts", "tool_calls", "errors"}.issubset(
+                data["output"].keys()
+            )
         ):
             output_state = data["output"]
 

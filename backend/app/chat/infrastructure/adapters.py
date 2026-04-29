@@ -8,6 +8,7 @@ from app.chat.domain.ports import AnswerGeneratorPort, KnowledgeRetrieverPort, T
 from app.schemas.knowledge_base import RetrieveRequest
 from app.services.chat_tool_registry import ToolRegistry
 from app.services.knowledge_base_service import KnowledgeBaseService
+from app.chat.infrastructure.llm_adapter import ResolvedModel
 
 
 class KnowledgeBaseRetrieverAdapter(KnowledgeRetrieverPort):
@@ -50,3 +51,14 @@ class TemplateAnswerGeneratorAdapter(AnswerGeneratorPort):
         if not has_hits:
             return "未检索到知识库上下文，以下回答可能不准确。" f"问题：{question}"
         return f"基于检索结果回答：{question}\n\n{context}"
+
+
+class ModelAwareAnswerGeneratorAdapter(AnswerGeneratorPort):
+    def __init__(self, *, inner: AnswerGeneratorPort, model: ResolvedModel) -> None:
+        self._inner = inner
+        self._model = model
+
+    def generate(self, *, question: str, context: str, has_hits: bool) -> str:
+        base = self._inner.generate(question=question, context=context, has_hits=has_hits)
+        tag = f"[model: {self._model.provider}/{self._model.model_name}]"
+        return f"{tag}\n{base}"

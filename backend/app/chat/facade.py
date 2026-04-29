@@ -16,17 +16,26 @@ from app.services.knowledge_base_service import KnowledgeBaseService
 
 
 class ChatFacade:
-    def __init__(self, kb_service: KnowledgeBaseService, tool_registry: ToolRegistry) -> None:
+    def __init__(
+        self,
+        kb_service: KnowledgeBaseService,
+        tool_registry: ToolRegistry,
+        *,
+        answer_generator: "AnswerGeneratorPort | None" = None,
+    ) -> None:
+        from app.chat.domain.ports import AnswerGeneratorPort
+
+        generator = answer_generator or TemplateAnswerGeneratorAdapter()
         self._quick_use_case = RunQuickChatUseCase(
             retriever=KnowledgeBaseRetrieverAdapter(kb_service),
             tool_invoker=QuickModeToolInvokerAdapter(tool_registry),
-            answer_generator=TemplateAnswerGeneratorAdapter(),
+            answer_generator=generator,
             mode="quick",
         )
         self._agent_use_case = RunAgentChatUseCase(
             retriever=KnowledgeBaseRetrieverAdapter(kb_service),
             tool_invoker=QuickModeToolInvokerAdapter(tool_registry),
-            answer_generator=TemplateAnswerGeneratorAdapter(),
+            answer_generator=generator,
             max_iters=3,
         )
         self._data_use_case = RunDataChatUseCase()

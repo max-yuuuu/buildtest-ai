@@ -11,6 +11,7 @@ from app.chat.domain.models import RetrievalAttempt, ToolCallRecord
 from app.chat.graphs.quick_chat_graph import astream_quick_graph
 from app.chat.infrastructure.adapters import (
     KnowledgeBaseRetrieverAdapter,
+    ModelAwareAnswerGeneratorAdapter,
     QuickModeToolInvokerAdapter,
     TemplateAnswerGeneratorAdapter,
 )
@@ -196,14 +197,23 @@ class ChatService:
                 status_code=500,
                 detail={"code": "CHAT_MODE_MISMATCH", "message": "expected quick mode"},
             )
+        selected_model = await self._resolve_model_for_request(body)
         kb_service = KnowledgeBaseService(self._session, self._user_id)
         registry = ToolRegistry()
         registry.register("api_retrieve", "api", self._api_retrieve_tool)
         registry.set_mode_allowlist("quick", {"api_retrieve"})
-        facade = ChatFacade(kb_service=kb_service, tool_registry=registry)
+        facade = ChatFacade(
+            kb_service=kb_service,
+            tool_registry=registry,
+            answer_generator=ModelAwareAnswerGeneratorAdapter(
+                inner=TemplateAnswerGeneratorAdapter(),
+                model=selected_model,
+            ),
+        )
         return await facade.run_quick(knowledge_base_ids=body.knowledge_base_ids, message=body.message)
 
     async def _stream_quick_graph_events(self, body: ChatRequest) -> AsyncIterator[dict]:
+        selected_model = await self._resolve_model_for_request(body)
         kb_service = KnowledgeBaseService(self._session, self._user_id)
         registry = ToolRegistry()
         registry.register("api_retrieve", "api", self._api_retrieve_tool)
@@ -211,7 +221,10 @@ class ChatService:
 
         retriever = KnowledgeBaseRetrieverAdapter(kb_service)
         tool_invoker = QuickModeToolInvokerAdapter(registry)
-        answer_generator = TemplateAnswerGeneratorAdapter()
+        answer_generator = ModelAwareAnswerGeneratorAdapter(
+            inner=TemplateAnswerGeneratorAdapter(),
+            model=selected_model,
+        )
 
         async def retrieve_attempts(
             knowledge_base_id: uuid.UUID,
@@ -251,24 +264,25 @@ class ChatService:
             yield graph_evt
 
     async def _stream_agent_graph_events(self, body: ChatRequest) -> AsyncIterator[dict]:
+        selected_model = await self._resolve_model_for_request(body)
         kb_service = KnowledgeBaseService(self._session, self._user_id)
         registry = ToolRegistry()
         registry.register("api_retrieve", "api", self._api_retrieve_tool)
         registry.set_mode_allowlist("quick", {"api_retrieve"})
         registry.set_mode_allowlist("agent", {"api_retrieve"})
 
-        facade = ChatFacade(kb_service=kb_service, tool_registry=registry)
-        # agent 目前使用同一套模板生成器与检索策略（LangGraph 控制循环）
         from app.chat.graphs.agent_chat_graph import astream_agent_graph  # local import to avoid cycles
         from app.chat.infrastructure.adapters import (
             KnowledgeBaseRetrieverAdapter,
             QuickModeToolInvokerAdapter,
-            TemplateAnswerGeneratorAdapter,
         )
 
         retriever = KnowledgeBaseRetrieverAdapter(kb_service)
         tool_invoker = QuickModeToolInvokerAdapter(registry)
-        answer_generator = TemplateAnswerGeneratorAdapter()
+        answer_generator = ModelAwareAnswerGeneratorAdapter(
+            inner=TemplateAnswerGeneratorAdapter(),
+            model=selected_model,
+        )
 
         async for graph_evt in astream_agent_graph(
             message=body.message,
