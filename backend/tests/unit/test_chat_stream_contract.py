@@ -60,7 +60,7 @@ async def test_chat_stream_event_order_and_single_done():
 
 
 @pytest.mark.asyncio
-async def test_chat_stream_terminates_on_error_without_done():
+async def test_chat_stream_emits_done_after_error():
     service = ChatService(session=None, user_id=uuid.uuid4())  # type: ignore[arg-type]
 
     async def fake_stream_quick_graph_events(_body):  # noqa: ANN001
@@ -75,8 +75,8 @@ async def test_chat_stream_terminates_on_error_without_done():
             ChatRequest(message="hello", knowledge_base_ids=[uuid.uuid4()], mode="quick")
         )
     ]
-    assert events[-1]["type"] == "error"
-    assert not any(e["type"] == "done" for e in events)
+    assert events[-2]["type"] == "error"
+    assert events[-1]["type"] == "done"
 
 
 @pytest.mark.asyncio

@@ -120,7 +120,7 @@ async def test_kb_crud_and_upload_retrieve(client, user_headers, fake_embed, mon
     )
     assert r.status_code == 201, r.text
     doc = r.json()
-    assert doc["status"] in ("completed", "processing", "failed")
+    assert doc["status"] in ("queued", "completed", "processing", "failed")
     if doc["status"] == "completed":
         assert doc["chunk_count"] >= 1
 

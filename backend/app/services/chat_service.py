@@ -99,6 +99,7 @@ class ChatService:
                 trace_id,
                 {"code": code, "message": message, "retryable": False},
             )
+            yield self._event("done", trace_id, {"message_id": message_id, "latency_ms": 0})
             return
         except Exception as exc:
             yield self._event(
@@ -106,6 +107,7 @@ class ChatService:
                 trace_id,
                 {"code": "CHAT_INTERNAL_ERROR", "message": str(exc), "retryable": False},
             )
+            yield self._event("done", trace_id, {"message_id": message_id, "latency_ms": 0})
             return
 
         for tool_call in result.tool_calls:

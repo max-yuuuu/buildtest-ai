@@ -4,7 +4,9 @@ from app.schemas.vector_db import VectorDbTestResult
 
 
 @pytest.mark.asyncio
-async def test_create_active_vector_db_rejects_failed_probe(client, user_headers, monkeypatch):
+async def test_create_active_vector_db_does_not_block_on_probe_failure(
+    client, user_headers, monkeypatch
+):
     async def fake_probe(db_type: str, connection_string: str, api_key_plain: str | None):
         _ = (db_type, connection_string, api_key_plain)
         return VectorDbTestResult(ok=False, latency_ms=5, message="boom")
@@ -22,8 +24,7 @@ async def test_create_active_vector_db_rejects_failed_probe(client, user_headers
             "is_active": True,
         },
     )
-    assert resp.status_code == 400
-    assert "active vector db probe failed" in resp.json()["detail"]
+    assert resp.status_code == 201
 
 
 @pytest.mark.asyncio

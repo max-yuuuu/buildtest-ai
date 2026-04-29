@@ -64,7 +64,6 @@ class IngestionJobRepository:
                 status="processing",
                 started_at=datetime.now(UTC),
                 error_message=None,
-                attempt_count=IngestionJob.attempt_count + 1,
             )
         )
         result = await self.session.execute(stmt)
@@ -118,6 +117,7 @@ class IngestionJobRepository:
                 started_at=None,
                 finished_at=None,
                 error_message=None,
+                attempt_count=IngestionJob.attempt_count + 1,
             )
         )
         result = await self.session.execute(stmt)

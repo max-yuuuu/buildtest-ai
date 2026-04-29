@@ -1,13 +1,11 @@
 import asyncio
+import threading
 import uuid
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.core.database import async_session_maker
 from app.services.knowledge_base_service import KnowledgeBaseService
-
-_worker_loop: asyncio.AbstractEventLoop | None = None
-
 
 async def _run_ingestion(
     user_id: str,
@@ -25,11 +23,29 @@ async def _run_ingestion(
 
 
 def _run_async(coro) -> None:
-    global _worker_loop
-    if _worker_loop is None or _worker_loop.is_closed():
-        _worker_loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(_worker_loop)
-    _worker_loop.run_until_complete(coro)
+    try:
+        running_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        running_loop = None
+
+    if running_loop and running_loop.is_running():
+        error: Exception | None = None
+
+        def _runner() -> None:
+            nonlocal error
+            try:
+                asyncio.run(coro)
+            except Exception as exc:  # pragma: no cover - re-raised below
+                error = exc
+
+        thread = threading.Thread(target=_runner)
+        thread.start()
+        thread.join()
+        if error is not None:
+            raise error
+        return
+
+    asyncio.run(coro)
 
 
 @celery_app.task(name="app.tasks.ingestion.process_document_ingestion_task")
