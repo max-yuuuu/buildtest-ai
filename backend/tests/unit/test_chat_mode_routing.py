@@ -13,11 +13,17 @@ def test_chat_request_defaults_mode_to_quick():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["agent", "data"])
-async def test_chat_service_rejects_non_mvp_modes(mode: str):
+async def test_chat_service_agent_mode_returns_answer():
+    service = ChatService(session=None, user_id=uuid.uuid4())  # type: ignore[arg-type]
+    result = await service.run(ChatRequest(message="hello", mode="agent", knowledge_base_ids=[uuid.uuid4()]))
+    assert result.mode == "agent"
+    assert isinstance(result.answer, str)
+
+
+@pytest.mark.asyncio
+async def test_chat_service_rejects_data_mode():
     service = ChatService(session=None, user_id=uuid.uuid4())  # type: ignore[arg-type]
     with pytest.raises(HTTPException) as exc:
-        await service.run(ChatRequest(message="hello", mode=mode, knowledge_base_ids=[uuid.uuid4()]))
-
+        await service.run(ChatRequest(message="hello", mode="data", knowledge_base_ids=[uuid.uuid4()]))
     assert exc.value.status_code == 501
     assert exc.value.detail["code"] == "MODE_NOT_IMPLEMENTED"
