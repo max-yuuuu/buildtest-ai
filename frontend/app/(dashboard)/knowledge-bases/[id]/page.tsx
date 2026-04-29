@@ -43,6 +43,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { knowledgeBaseApi, modelApi, providerApi } from "@/lib/api";
 import type { KbDocument, Model, Provider, RetrieveResponse } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -431,29 +432,40 @@ export default function KnowledgeBaseDetailPage() {
           </button>
         ) : (
           <div className="overflow-hidden rounded-xl border bg-card">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium">文件名</th>
-                  <th className="px-4 py-2 text-left font-medium">状态</th>
-                  <th className="px-4 py-2 text-left font-medium">切块</th>
-                  <th className="px-4 py-2 text-left font-medium">大小</th>
-                  <th className="px-4 py-2 text-right font-medium">操作</th>
-                </tr>
-              </thead>
-              <tbody>
+            <div className="overflow-auto">
+              <table className="w-full caption-bottom text-sm">
+                <TableHeader className="text-xs">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="sticky top-0 z-10 h-10 bg-card py-2">
+                      文件名
+                    </TableHead>
+                    <TableHead className="sticky top-0 z-10 h-10 bg-card py-2">
+                      状态
+                    </TableHead>
+                    <TableHead className="sticky top-0 z-10 h-10 bg-card py-2">
+                      切块
+                    </TableHead>
+                    <TableHead className="sticky top-0 z-10 h-10 bg-card py-2">
+                      大小
+                    </TableHead>
+                    <TableHead className="sticky top-0 z-10 h-10 bg-card py-2 text-right">
+                      操作
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                 {docs.map((d) => (
-                  <tr
+                  <TableRow
                     key={d.id}
-                    className="border-t transition-colors hover:bg-muted/30"
+                    className="transition-colors hover:bg-muted/30"
                   >
-                    <td className="px-4 py-2.5">
+                    <TableCell className="py-2.5">
                       <div className="flex min-w-0 items-center gap-2">
                         <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                         <span className="truncate">{d.file_name}</span>
                       </div>
-                    </td>
-                    <td className="px-4 py-2.5">
+                    </TableCell>
+                    <TableCell className="py-2.5">
                       <StatusBadge status={d.status as DocStatus} />
                       {d.error_message && (
                         <p
@@ -463,14 +475,14 @@ export default function KnowledgeBaseDetailPage() {
                           {d.error_message}
                         </p>
                       )}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    </TableCell>
+                    <TableCell className="py-2.5 text-xs text-muted-foreground">
                       {d.chunk_count} 块
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    </TableCell>
+                    <TableCell className="py-2.5 text-xs text-muted-foreground">
                       {formatSize(d.file_size)}
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
+                    </TableCell>
+                    <TableCell className="py-2.5 text-right">
                       <div className="flex items-center justify-end gap-1">
                         {d.status === "failed" && (
                           <Button
@@ -521,11 +533,12 @@ export default function KnowledgeBaseDetailPage() {
                           删除
                         </Button>
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+                </TableBody>
+              </table>
+            </div>
           </div>
         )}
       </section>

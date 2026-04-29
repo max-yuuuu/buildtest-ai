@@ -30,6 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { modelApi, providerApi } from "@/lib/api";
 import type { AvailableModel, Model, ModelType } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -284,30 +285,37 @@ export default function ProviderModelsPage() {
         )}
         {registeredQ.data && registeredQ.data.length > 0 && (
           <div className="overflow-hidden rounded-xl border bg-card">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium">model_id</th>
-                  <th className="px-4 py-2 text-left font-medium">类型</th>
-                  <th className="px-4 py-2 text-left font-medium">
-                    context / dim
-                  </th>
-                  <th className="px-4 py-2 text-right font-medium">操作</th>
-                </tr>
-              </thead>
-              <tbody>
+            <div className="overflow-auto">
+              <table className="w-full caption-bottom text-sm">
+                <TableHeader className="text-xs">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="sticky top-0 z-10 h-10 bg-card py-2">
+                      model_id
+                    </TableHead>
+                    <TableHead className="sticky top-0 z-10 h-10 bg-card py-2">
+                      类型
+                    </TableHead>
+                    <TableHead className="sticky top-0 z-10 h-10 bg-card py-2">
+                      context / dim
+                    </TableHead>
+                    <TableHead className="sticky top-0 z-10 h-10 bg-card py-2 text-right">
+                      操作
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                 {registeredQ.data.map((m) => (
-                  <tr
+                  <TableRow
                     key={m.id}
-                    className="border-t transition-colors hover:bg-muted/30"
+                    className="transition-colors hover:bg-muted/30"
                   >
-                    <td className="px-4 py-2.5 font-mono text-xs">
+                    <TableCell className="py-2.5 font-mono text-xs">
                       {m.model_id}
-                    </td>
-                    <td className="px-4 py-2.5">
+                    </TableCell>
+                    <TableCell className="py-2.5">
                       <TypeBadge type={m.model_type} />
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    </TableCell>
+                    <TableCell className="py-2.5 text-xs text-muted-foreground">
                       {m.model_type === "llm"
                         ? m.context_window
                           ? `ctx ${m.context_window.toLocaleString()}`
@@ -315,8 +323,8 @@ export default function ProviderModelsPage() {
                         : m.vector_dimension
                           ? `dim ${m.vector_dimension}`
                           : "—"}
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
+                    </TableCell>
+                    <TableCell className="py-2.5 text-right">
                       <div className="flex justify-end gap-1">
                         <Button
                           variant="ghost"
@@ -337,11 +345,12 @@ export default function ProviderModelsPage() {
                           取消登记
                         </Button>
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+                </TableBody>
+              </table>
+            </div>
           </div>
         )}
       </section>

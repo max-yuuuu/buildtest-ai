@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { knowledgeBaseApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
@@ -95,37 +96,37 @@ export default function DocumentChunksPage() {
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-5">
           <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border bg-card lg:col-span-3">
             <div className="min-h-0 flex-1 overflow-auto">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 z-10 bg-muted/40 text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium">Chunk #</th>
-                  <th className="px-4 py-2 text-left font-medium">预览文本</th>
-                  <th className="px-4 py-2 text-left font-medium">字符长度</th>
-                  <th className="px-4 py-2 text-left font-medium">Token 长度</th>
-                  <th className="px-4 py-2 text-left font-medium">页码</th>
-                  <th className="px-4 py-2 text-left font-medium">章节</th>
-                </tr>
-                </thead>
-                <tbody>
+              <table className="w-full caption-bottom text-sm">
+                <TableHeader className="text-xs">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="sticky top-0 z-10 h-10 bg-card py-2">Chunk #</TableHead>
+                    <TableHead className="sticky top-0 z-10 h-10 bg-card py-2">预览文本</TableHead>
+                    <TableHead className="sticky top-0 z-10 h-10 bg-card py-2">字符长度</TableHead>
+                    <TableHead className="sticky top-0 z-10 h-10 bg-card py-2">Token 长度</TableHead>
+                    <TableHead className="sticky top-0 z-10 h-10 bg-card py-2">页码</TableHead>
+                    <TableHead className="sticky top-0 z-10 h-10 bg-card py-2">章节</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {data.items.map((item) => (
-                    <tr
+                    <TableRow
                       key={item.id}
-                      className={`cursor-pointer border-t align-top ${
-                        selectedChunk?.id === item.id ? "bg-primary/5" : ""
+                      className={`cursor-pointer align-top ${
+                        selectedChunk?.id === item.id ? "bg-primary/5 hover:bg-primary/10" : ""
                       }`}
                       onClick={() => setSelectedChunkId(item.id)}
                     >
-                      <td className="px-4 py-2.5">{item.chunk_index}</td>
-                      <td className="max-w-xl truncate px-4 py-2.5" title={item.preview_text ?? ""}>
+                      <TableCell className="py-2.5">{item.chunk_index}</TableCell>
+                      <TableCell className="max-w-xl truncate py-2.5" title={item.preview_text ?? ""}>
                         {item.preview_text ?? "（无预览）"}
-                      </td>
-                      <td className="px-4 py-2.5">{item.char_length ?? "-"}</td>
-                      <td className="px-4 py-2.5">{item.token_length ?? "-"}</td>
-                      <td className="px-4 py-2.5">{String(item.source?.page ?? "-")}</td>
-                      <td className="px-4 py-2.5">{String(item.source?.section ?? "-")}</td>
-                    </tr>
+                      </TableCell>
+                      <TableCell className="py-2.5">{item.char_length ?? "-"}</TableCell>
+                      <TableCell className="py-2.5">{item.token_length ?? "-"}</TableCell>
+                      <TableCell className="py-2.5">{String(item.source?.page ?? "-")}</TableCell>
+                      <TableCell className="py-2.5">{String(item.source?.section ?? "-")}</TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
+                </TableBody>
               </table>
             </div>
           </div>
@@ -179,26 +180,28 @@ export default function DocumentChunksPage() {
                     ) : null}
                   </div>
                 ) : (
-                  <div className="p-4 text-xs text-muted-foreground">当前 chunk 无 page_image 资源</div>
+                  <div className="flex h-full min-h-48 items-center justify-center rounded border border-dashed bg-muted/10 p-4 text-xs text-muted-foreground">
+                    当前 chunk 无 page_image 资源
+                  </div>
                 )}
               </div>
 
-              <div className="space-y-2">
+              <div className="shrink-0 space-y-2">
                 <div className="text-xs font-medium">Crop 预览</div>
-                {cropAssetUrl ? (
-                  <div className="max-h-44 overflow-auto rounded border bg-muted/20 p-2">
+                <div className="h-44 overflow-auto rounded border bg-muted/20 p-2">
+                  {cropAssetUrl ? (
                     <img src={cropAssetUrl} alt="crop replay" className="h-auto w-full object-contain" />
-                  </div>
-                ) : (
-                  <div className="rounded border border-dashed p-3 text-xs text-muted-foreground">
-                    当前 chunk 无 crop_image 资源
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex h-full items-center justify-center rounded border border-dashed bg-muted/10 p-3 text-xs text-muted-foreground">
+                      当前 chunk 无 crop_image 资源
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="space-y-1 text-xs">
+              <div className="shrink-0 space-y-1 text-xs">
                 <div className="font-medium">多模态字段</div>
-                <div className="max-h-28 overflow-auto rounded bg-muted/40 p-2 text-muted-foreground">
+                <div className="h-28 overflow-auto rounded bg-muted/40 p-2 text-muted-foreground">
                   {(selectedChunk?.preview_text ?? "").slice(0, 300) || "无 OCR/caption/table_md/latex 展示内容"}
                 </div>
               </div>
