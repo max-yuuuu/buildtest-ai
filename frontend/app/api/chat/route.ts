@@ -1,37 +1,11 @@
 import { auth } from "@/lib/auth";
+import {
+  createChatStreamMappingState,
+  mapBackendEventToUiMessageChunkSse,
+  type BackendEvent,
+} from "@/lib/server/chat-stream-mapper";
+import { resolveBackendBaseUrl } from "@/lib/server/backend-url";
 import { NextRequest, NextResponse } from "next/server";
-
-const BACKEND_CANDIDATES = [
-  process.env.BACKEND_URL,
-  "http://localhost:8000",
-  "http://backend:8000",
-  "http://host.docker.internal:8000",
-].filter((v): v is string => Boolean(v && v.trim() !== ""));
-
-let cachedBackendBaseUrl: string | null = null;
-
-type BackendEvent = Record<string, unknown> & { type?: string };
-
-async function isBackendReachable(baseUrl: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${baseUrl}/healthz`, { method: "GET", cache: "no-store" });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function resolveBackendBaseUrl(): Promise<string> {
-  if (cachedBackendBaseUrl) return cachedBackendBaseUrl;
-  for (const candidate of BACKEND_CANDIDATES) {
-    if (await isBackendReachable(candidate)) {
-      cachedBackendBaseUrl = candidate;
-      return candidate;
-    }
-  }
-  cachedBackendBaseUrl = BACKEND_CANDIDATES[0] ?? "http://localhost:8000";
-  return cachedBackendBaseUrl;
-}
 
 function xUserNameHeaderValue(name: string | null | undefined): string {
   const utf8 = new TextEncoder().encode(name ?? "");
@@ -41,17 +15,40 @@ function xUserNameHeaderValue(name: string | null | undefined): string {
   return `b64.${b64}`;
 }
 
-function mapEvent(evt: BackendEvent): string[] {
-  const kind = evt.type;
-  if (kind === "token") return [`data: ${JSON.stringify({ type: "text", text: evt.text ?? "" })}\n\n`];
-  if (kind === "citation")
-    return [`data: ${JSON.stringify({ type: "data-citation", data: evt })}\n\n`];
-  if (kind === "step") return [`data: ${JSON.stringify({ type: "data-step", data: evt })}\n\n`];
-  if (kind === "error") return [`data: ${JSON.stringify({ type: "data-error", data: evt })}\n\n`];
-  if (kind === "start" || kind === "done")
-    return [`data: ${JSON.stringify({ type: "data-status", data: evt })}\n\n`];
-  return [];
+type UiMessagePart = {
+  type?: string;
+  text?: string;
+};
+
+type UiMessage = {
+  role?: string;
+  parts?: UiMessagePart[];
+};
+
+type ChatRouteRequestBody = {
+  mode?: string;
+  knowledge_base_ids?: string[];
+  messages?: UiMessage[];
+};
+
+function extractLatestUserTextMessage(messages: UiMessage[] | undefined): string | null {
+  if (!Array.isArray(messages)) return null;
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.role !== "user" || !Array.isArray(message.parts)) continue;
+    const text = message.parts
+      .filter((part) => part?.type === "text" && typeof part.text === "string")
+      .map((part) => part.text!.trim())
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+    if (text) return text;
+  }
+
+  return null;
 }
+
 
 async function* parseSse(reader: ReadableStreamDefaultReader<Uint8Array>): AsyncGenerator<BackendEvent> {
   const decoder = new TextDecoder();
@@ -83,7 +80,13 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const backendBaseUrl = await resolveBackendBaseUrl();
-  const body = await req.json();
+  const body = (await req.json()) as ChatRouteRequestBody;
+  const message = extractLatestUserTextMessage(body.messages);
+
+  if (!message) {
+    return NextResponse.json({ error: "Missing user message" }, { status: 400 });
+  }
+
   const upstream = await fetch(`${backendBaseUrl}/api/v1/chat/stream`, {
     method: "POST",
     headers: {
@@ -92,7 +95,11 @@ export async function POST(req: NextRequest) {
       "X-User-Email": session.user.email ?? "",
       "X-User-Name": xUserNameHeaderValue(session.user.name),
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      mode: body.mode ?? "quick",
+      knowledge_base_ids: body.knowledge_base_ids ?? [],
+      message,
+    }),
   });
 
   if (!upstream.ok || !upstream.body) {
@@ -107,9 +114,11 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const reader = upstream.body!.getReader();
+      const state = createChatStreamMappingState();
       for await (const event of parseSse(reader)) {
-        for (const line of mapEvent(event)) controller.enqueue(encoder.encode(line));
-        if (event.type === "error") break;
+        for (const line of mapBackendEventToUiMessageChunkSse(event, state)) {
+          controller.enqueue(encoder.encode(line));
+        }
       }
       controller.close();
     },
@@ -120,6 +129,7 @@ export async function POST(req: NextRequest) {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      "x-vercel-ai-ui-message-stream": "v1",
     },
   });
 }

@@ -1,41 +1,6 @@
 import { auth } from "@/lib/auth";
+import { resolveBackendBaseUrl } from "@/lib/server/backend-url";
 import { NextRequest, NextResponse } from "next/server";
-
-const BACKEND_CANDIDATES = [
-  process.env.BACKEND_URL,
-  "http://localhost:8000",
-  "http://backend:8000",
-  "http://host.docker.internal:8000",
-].filter((v): v is string => Boolean(v && v.trim() !== ""));
-
-let cachedBackendBaseUrl: string | null = null;
-
-async function isBackendReachable(baseUrl: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${baseUrl}/healthz`, {
-      method: "GET",
-      cache: "no-store",
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function resolveBackendBaseUrl(): Promise<string> {
-  if (cachedBackendBaseUrl) return cachedBackendBaseUrl;
-
-  for (const candidate of BACKEND_CANDIDATES) {
-    if (await isBackendReachable(candidate)) {
-      cachedBackendBaseUrl = candidate;
-      return candidate;
-    }
-  }
-
-  // 无法探测时回退第一个候选，保持错误信息稳定且便于排查。
-  cachedBackendBaseUrl = BACKEND_CANDIDATES[0] ?? "http://localhost:8000";
-  return cachedBackendBaseUrl;
-}
 
 /** HTTP fetch Headers 值必须是 Latin-1；OAuth 显示名可能含中文，用 Base64URL(UTF-8) 透传。 */
 function xUserNameHeaderValue(name: string | null | undefined): string {

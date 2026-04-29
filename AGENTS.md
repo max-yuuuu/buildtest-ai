@@ -77,7 +77,7 @@ BuildTest AI 是面向 RAG / Agent 应用的 **开发 + 评测 + 迭代** 一体
 
 ## 高层架构
 
-三层结构,通过 `docker-compose.yml` 编排(`postgres` / `redis` / `qdrant` / `backend` / `celery-worker` / `frontend`):
+三层结构,开发期通过 `scripts/dev` 与 `compose.base.yml` / `compose.dev.yml` / `compose.prod.yml` / `compose.infra.yml` 编排(`postgres` / `redis` / `qdrant` / `backend` / `celery-worker` / `frontend`):
 
 1. **frontend/** — Next.js 15 (App Router, React 19) + TypeScript + shadcn/ui。**同时承担 BFF 角色**:`app/api/backend/[...path]/route.ts` 负责 NextAuth session 校验后透传请求到 Python 后端,并在 header 注入 `X-User-Id`。前端组件**不直连 FastAPI**,统一走 `/api/backend/*`。
 2. **backend/** — Python 3.12 + FastAPI。分层:`api/v1/`(参数校验与编排,薄)→ `services/`(业务逻辑,厚)→ `repositories/`(DB 访问)→ `models/`(SQLAlchemy)。耗时操作(文档向量化、评测执行)走 `app/tasks/` 下的 Celery 任务,**不能在请求线程内同步完成**(Phase 1 例外:embedding 允许先同步,需显式 TODO)。
