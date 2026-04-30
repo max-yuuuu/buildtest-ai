@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     qdrant_api_key: str | None = None
 
     app_encryption_key: str = ""
+    resend_api_key: str = ""
 
     upload_max_size_mb: int = 500
     # Use a writable local path by default when running backend directly.
