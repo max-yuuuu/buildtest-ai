@@ -20,8 +20,8 @@ type Mode = "login" | "register";
 
 function EmailAuthForm({ callbackUrl }: { callbackUrl: string }) {
   const [mode, setMode] = useState<Mode>("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("admin@buildtest.ai");
+  const [password, setPassword] = useState("123456");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");

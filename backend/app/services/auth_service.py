@@ -97,12 +97,30 @@ class AuthService:
         return RegisterResponse(success=True)
 
     async def check_email(self, email: str) -> CheckEmailResponse:
+        if email in self._BUILTIN_TEST_ACCOUNTS:
+            return CheckEmailResponse(registered=True)
         user = await self.user_repo.get_by_external_id(f"credentials:{email}")
         return CheckEmailResponse(registered=user is not None)
+
+    # 内置测试账号，仅用于开发环境
+    _BUILTIN_TEST_ACCOUNTS: dict[str, tuple[str, str | None]] = {
+        "admin@buildtest.ai": ("123456", "Admin"),
+    }
 
     async def verify_password(
         self, email: str, password: str
     ) -> VerifyPasswordResponse | None:
+        # 先检查内置测试账号
+        if email in self._BUILTIN_TEST_ACCOUNTS:
+            expected_password, name = self._BUILTIN_TEST_ACCOUNTS[email]
+            if password == expected_password:
+                return VerifyPasswordResponse(
+                    id=f"credentials:{email}",
+                    email=email,
+                    name=name,
+                )
+            return None
+
         user = await self.user_repo.get_by_external_id(f"credentials:{email}")
         if user is None or user.password_hash is None:
             return None
