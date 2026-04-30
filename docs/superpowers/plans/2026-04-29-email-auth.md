@@ -213,7 +213,7 @@ logger = logging.getLogger(__name__)
 
 resend.api_key = settings.resend_api_key
 
-FROM_ADDRESS = "BuildTest AI <noreply@buildtest.ai>"
+FROM_ADDRESS = "BuildTest AI <noreply@buildtest.asia>"
 
 
 def _verification_code_html(code: str) -> str:
