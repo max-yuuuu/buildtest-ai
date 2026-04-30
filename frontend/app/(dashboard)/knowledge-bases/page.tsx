@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Route } from "next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -462,7 +461,6 @@ function KnowledgeBaseCard({
   onDelete: () => void;
 }) {
   const meta = pickGradient(kb.id);
-  const detailHref = `/knowledge-bases/${kb.id}` as Route;
   const multimodal = getMultimodalSummary(kb);
   return (
     <div
@@ -475,7 +473,7 @@ function KnowledgeBaseCard({
       <div className={cn("h-1 w-full bg-gradient-to-r", meta.bar)} />
 
       <Link
-        href={detailHref}
+        href={`/knowledge-bases/${kb.id}`}
         className="absolute inset-0 z-10"
         aria-label={`查看 ${kb.name}`}
       />
@@ -513,7 +511,7 @@ function KnowledgeBaseCard({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenuItem asChild>
-                  <Link href={detailHref}>管理文档</Link>
+                  <Link href={`/knowledge-bases/${kb.id}`}>管理文档</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

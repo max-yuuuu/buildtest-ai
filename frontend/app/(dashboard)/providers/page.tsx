@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { Route } from "next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Boxes,
@@ -362,7 +361,7 @@ function ProviderCard({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
-                <Link href={`/providers/${provider.id}/models` as Route}>
+                <Link href={`/providers/${provider.id}/models`}>
                   管理模型
                 </Link>
               </DropdownMenuItem>
@@ -422,7 +421,7 @@ function ProviderCard({
             </Badge>
           )}
           <Link
-            href={`/providers/${provider.id}/models` as Route}
+            href={`/providers/${provider.id}/models`}
             className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
           >
             <Boxes className="h-3.5 w-3.5" />

@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import type { Route } from "next";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { knowledgeBaseApi } from "@/lib/api";
@@ -48,7 +47,7 @@ export default function DocumentChunksPage() {
       <div className="space-y-4 p-6">
         <p className="text-sm text-destructive">{errorText}</p>
         <Button asChild variant="outline">
-          <Link href={`/knowledge-bases/${kbId}` as Route}>
+          <Link href={`/knowledge-bases/${kbId}`}>
             <ArrowLeft className="mr-1 h-4 w-4" />
             返回文档列表
           </Link>
@@ -81,7 +80,7 @@ export default function DocumentChunksPage() {
           </p>
         </div>
         <Button asChild variant="outline">
-          <Link href={`/knowledge-bases/${kbId}` as Route}>
+          <Link href={`/knowledge-bases/${kbId}`}>
             <ArrowLeft className="mr-1 h-4 w-4" />
             返回文档列表
           </Link>

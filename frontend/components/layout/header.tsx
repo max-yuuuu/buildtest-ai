@@ -11,9 +11,18 @@ import {
   Bell,
   ArrowUpRight,
   Loader2,
+  Menu,
 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { knowledgeBaseApi, notificationApi, providerApi, vectorDbApi } from "@/lib/api";
 import type { IngestionNotification, KnowledgeBase, Provider, VectorDbConfig } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -31,6 +40,10 @@ const pageTitles: Record<string, { title: string; description?: string }> = {
   "/vector-dbs": {
     title: "向量库",
     description: "pgvector、Qdrant 等连接与连通性测试",
+  },
+  "/chat": {
+    title: "Quick Chat",
+    description: "RAG 对话，支持默认知识库与 @ 多库",
   },
 };
 
@@ -59,6 +72,26 @@ const pageItems: SearchItem[] = [
     group: "页面",
   },
   { id: "page-vector-dbs", label: "向量库", href: "/vector-dbs", group: "页面" },
+  { id: "page-chat", label: "Quick Chat", href: "/chat", group: "页面" },
+];
+
+const mobileNavSections: { label: string; items: { href: string; label: string }[] }[] = [
+  {
+    label: "工作台",
+    items: [{ href: "/dashboard", label: "概览" }],
+  },
+  {
+    label: "资源",
+    items: [
+      { href: "/providers", label: "Provider" },
+      { href: "/vector-dbs", label: "向量库" },
+      { href: "/knowledge-bases", label: "知识库" },
+    ],
+  },
+  {
+    label: "构建",
+    items: [{ href: "/chat", label: "Quick Chat" }],
+  },
 ];
 
 function includesKeyword(...values: Array<string | undefined>) {
@@ -104,6 +137,7 @@ export function Header() {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -317,7 +351,59 @@ export function Header() {
         className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent"
       />
 
+      <Dialog open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>导航</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            {mobileNavSections.map((section, index) => (
+              <div key={section.label}>
+                {index > 0 ? <Separator className="mb-3" /> : null}
+                <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  {section.label}
+                </div>
+                <nav className="flex flex-col gap-1">
+                  {section.items.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href as never}
+                      onClick={() => setMobileNavOpen(false)}
+                      className={cn(
+                        "rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                        pathname === item.href || pathname.startsWith(`${item.href}/`)
+                          ? "bg-primary/10 text-foreground"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      )}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+            ))}
+            <p className="text-xs text-muted-foreground">
+              大屏可使用侧栏或{" "}
+              <kbd className="rounded border border-border/70 bg-muted/50 px-1 py-0.5 font-mono text-[10px]">
+                ⌘K
+              </kbd>{" "}
+              打开搜索跳转。
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex min-w-0 flex-1 items-center gap-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="shrink-0 rounded-lg md:hidden"
+          aria-label="打开导航菜单"
+          onClick={() => setMobileNavOpen(true)}
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
         <div className="flex min-w-0 flex-col leading-tight">
           <h1 className="truncate text-sm font-semibold tracking-tight">
             {title}
