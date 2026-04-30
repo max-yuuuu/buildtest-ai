@@ -2,7 +2,7 @@
 
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import {
   Database,
   FlaskConical,
@@ -11,9 +11,223 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { authApi } from "@/lib/api";
 
-function LoginButtons() {
+type Mode = "login" | "register";
+
+function EmailAuthForm({ callbackUrl }: { callbackUrl: string }) {
+  const [mode, setMode] = useState<Mode>("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval>>();
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    timerRef.current = setInterval(() => {
+      setCooldown((c) => {
+        if (c <= 1) {
+          clearInterval(timerRef.current);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [cooldown]);
+
+  const handleCheckEmail = useCallback(async () => {
+    if (!email || !email.includes("@")) return;
+    try {
+      const res = await authApi.checkEmail(email);
+      setMode(res.registered ? "login" : "register");
+    } catch {
+      // ignore check errors
+    }
+  }, [email]);
+
+  const handleSendCode = async () => {
+    if (!email) return;
+    setError("");
+    setLoading(true);
+    try {
+      await authApi.sendCode(email);
+      setCodeSent(true);
+      setCooldown(60);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "发送验证码失败");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      if (mode === "register") {
+        await authApi.register({ email, code, password, name: name || undefined });
+      }
+      // Login (or auto-login after register)
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+        callbackUrl,
+      });
+      if (result?.error) {
+        setError(mode === "register" ? "注册成功但自动登录失败，请手动登录" : "邮箱或密码错误");
+      } else if (result?.url) {
+        window.location.href = result.url;
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "操作失败");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Mode tabs */}
+      <div className="flex rounded-lg border border-border/60 bg-muted/30 p-0.5">
+        <button
+          type="button"
+          onClick={() => {
+            setMode("login");
+            setError("");
+          }}
+          className={cn(
+            "flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
+            mode === "login"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          登录
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setMode("register");
+            setError("");
+          }}
+          className={cn(
+            "flex-1 rounded-md py-1.5 text-sm font-medium transition-colors",
+            mode === "register"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          注册
+        </button>
+      </div>
+
+      {/* Email */}
+      <div className="space-y-1.5">
+        <Label htmlFor="email" className="text-xs">
+          邮箱
+        </Label>
+        <Input
+          id="email"
+          type="email"
+          placeholder="name@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onBlur={handleCheckEmail}
+          required
+          className="h-9"
+        />
+      </div>
+
+      {/* Register-only fields */}
+      {mode === "register" && (
+        <>
+          <div className="space-y-1.5">
+            <Label htmlFor="code" className="text-xs">
+              验证码
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="code"
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="6 位数字"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                required
+                className="h-9 flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleSendCode}
+                disabled={loading || cooldown > 0}
+                className="h-9 shrink-0 text-xs"
+              >
+                {cooldown > 0 ? `${cooldown}s` : codeSent ? "重新发送" : "发送验证码"}
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="name" className="text-xs">
+              用户名 <span className="text-muted-foreground">(可选)</span>
+            </Label>
+            <Input
+              id="name"
+              type="text"
+              placeholder="你的名字"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="h-9"
+            />
+          </div>
+        </>
+      )}
+
+      {/* Password */}
+      <div className="space-y-1.5">
+        <Label htmlFor="password" className="text-xs">
+          密码
+        </Label>
+        <Input
+          id="password"
+          type="password"
+          placeholder={mode === "register" ? "至少 8 位，包含字母和数字" : "输入密码"}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          minLength={mode === "register" ? 8 : undefined}
+          className="h-9"
+        />
+      </div>
+
+      {/* Error */}
+      {error && (
+        <p className="text-xs text-destructive">{error}</p>
+      )}
+
+      {/* Submit */}
+      <Button type="submit" className="h-9 w-full text-sm" disabled={loading}>
+        {loading ? "处理中…" : mode === "register" ? "注册" : "登录"}
+      </Button>
+    </form>
+  );
+}
+
+function OAuthButtons() {
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl") ?? "/providers";
   const oauthClass =
@@ -74,6 +288,70 @@ const highlights = [
     iconBg: "bg-gradient-to-br from-violet-400 via-fuchsia-500 to-pink-500",
   },
 ] as const;
+
+function LoginContent() {
+  const params = useSearchParams();
+  const callbackUrl = params.get("callbackUrl") ?? "/providers";
+
+  return (
+    <div className="w-full max-w-[17rem] space-y-8 lg:max-w-none">
+      <div className="flex items-center gap-3 lg:hidden">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary via-fuchsia-500 to-cyan-500 text-white shadow-md animate-pulse-glow">
+          <Sparkles className="h-4 w-4 drop-shadow" aria-hidden />
+        </div>
+        <div>
+          <p className="text-base font-semibold tracking-tight">
+            BuildTest AI
+          </p>
+          <p className="text-xs text-muted-foreground">
+            RAG / Agent 开发 · 评测 · 迭代
+          </p>
+        </div>
+      </div>
+
+      <div className="relative space-y-7">
+        <div className="space-y-2 text-center lg:text-left">
+          <h1 className="text-2xl font-semibold tracking-tight text-ai-gradient sm:text-[1.6rem]">
+            登录到工作台
+          </h1>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            使用邮箱注册登录，或通过第三方账号快速登录。
+          </p>
+        </div>
+
+        {/* Email auth form */}
+        <EmailAuthForm callbackUrl={callbackUrl} />
+
+        {/* Divider */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border/60" />
+          </div>
+          <div className="relative flex justify-center text-xs">
+            <span className="bg-background px-2 text-muted-foreground">
+              或
+            </span>
+          </div>
+        </div>
+
+        {/* OAuth buttons */}
+        <OAuthButtons />
+
+        <p className="text-center text-xs leading-relaxed text-muted-foreground lg:text-left">
+          登录即表示同意{" "}
+          <span className="cursor-default underline underline-offset-4">
+            服务条款
+          </span>{" "}
+          与{" "}
+          <span className="cursor-default underline underline-offset-4">
+            隐私政策
+          </span>
+          。
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function LoginPage() {
   return (
@@ -190,54 +468,15 @@ export default function LoginPage() {
         </div>
 
         <div className="relative flex flex-1 flex-col items-center justify-center px-6 py-16 sm:px-10 sm:py-20 lg:px-32 lg:py-28">
-          <div className="w-full max-w-[17rem] space-y-8 lg:max-w-none">
-            <div className="flex items-center gap-3 lg:hidden">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary via-fuchsia-500 to-cyan-500 text-white shadow-md animate-pulse-glow">
-                <Sparkles className="h-4 w-4 drop-shadow" aria-hidden />
+          <Suspense
+            fallback={
+              <div className="py-2 text-center text-sm text-muted-foreground lg:text-left">
+                加载中…
               </div>
-              <div>
-                <p className="text-base font-semibold tracking-tight">
-                  BuildTest AI
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  RAG / Agent 开发 · 评测 · 迭代
-                </p>
-              </div>
-            </div>
-
-            <div className="relative space-y-7">
-              <div className="space-y-2 text-center lg:text-left">
-                <h1 className="text-2xl font-semibold tracking-tight text-ai-gradient sm:text-[1.6rem]">
-                  登录到工作台
-                </h1>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  选择第三方账号快速登录，首次登录将自动创建账户。
-                </p>
-              </div>
-
-              <Suspense
-                fallback={
-                  <div className="py-2 text-center text-sm text-muted-foreground lg:text-left">
-                    加载中…
-                  </div>
-                }
-              >
-                <LoginButtons />
-              </Suspense>
-
-              <p className="text-center text-xs leading-relaxed text-muted-foreground lg:text-left">
-                登录即表示同意{" "}
-                <span className="cursor-default underline underline-offset-4">
-                  服务条款
-                </span>{" "}
-                与{" "}
-                <span className="cursor-default underline underline-offset-4">
-                  隐私政策
-                </span>
-                。
-              </p>
-            </div>
-          </div>
+            }
+          >
+            <LoginContent />
+          </Suspense>
         </div>
       </section>
     </main>
