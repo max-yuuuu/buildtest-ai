@@ -218,3 +218,26 @@ export const notificationApi = {
       body: JSON.stringify({ notification_ids: notificationIds }),
     }),
 };
+
+export const authApi = {
+  sendCode: (email: string, purpose = "register") =>
+    request<{ success: boolean; expires_in: number }>("/auth/send-code", {
+      method: "POST",
+      body: JSON.stringify({ email, purpose }),
+    }),
+  register: (data: {
+    email: string;
+    code: string;
+    password: string;
+    name?: string;
+  }) =>
+    request<{ success: boolean }>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  checkEmail: (email: string) =>
+    request<{ registered: boolean }>("/auth/check-email", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+};
