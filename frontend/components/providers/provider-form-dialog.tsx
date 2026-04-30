@@ -7,7 +7,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import type { Route } from "next";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -171,7 +170,7 @@ export function ProviderFormDialog({ open, onOpenChange, initial }: Props) {
           `Provider 已创建,连通性预检未完成:${(err as Error).message}`,
         );
       }
-      router.push(`/providers/${provider.id}/models` as Route);
+      router.push(`/providers/${provider.id}/models`);
     },
     onError: (err: Error) => toast.error(err.message),
   });

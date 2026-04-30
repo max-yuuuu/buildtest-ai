@@ -5,6 +5,7 @@ import uuid
 
 from app.schemas.knowledge_base import RetrieveHit
 
+from app.chat.graphs.quick_chat_graph import run_quick_graph
 from app.chat.domain.models import QuickChatResult, RetrievalAttempt
 from app.chat.domain.ports import AnswerGeneratorPort, KnowledgeRetrieverPort, ToolInvokerPort
 
@@ -32,40 +33,25 @@ class RunQuickChatUseCase:
         self._mode = mode
 
     async def execute(self, *, knowledge_base_ids: list[uuid.UUID], message: str) -> QuickChatResult:
-        normalized = normalize_query(message)
-        all_hits: list[RetrieveHit] = []
-        all_attempts: list[RetrievalAttempt] = []
-        all_tool_calls: list[object] = []
-        errors: list[dict] = []
+        async def retrieve_attempts(
+            knowledge_base_id: uuid.UUID,
+            normalized_query: str,
+        ) -> tuple[list[RetrieveHit], list[RetrievalAttempt], list[object]]:
+            return await self._retrieve_attempts(
+                knowledge_base_id=knowledge_base_id,
+                normalized_query=normalized_query,
+            )
 
-        for knowledge_base_id in knowledge_base_ids:
-            try:
-                hits, attempts, tool_calls = await self._retrieve_attempts(
-                    knowledge_base_id=knowledge_base_id,
-                    normalized_query=normalized,
-                )
-                all_hits.extend(hits)
-                all_attempts.extend(attempts)
-                all_tool_calls.extend(tool_calls)
-            except Exception as exc:
-                errors.append(
-                    {
-                        "knowledge_base_id": str(knowledge_base_id),
-                        "code": "RETRIEVE_FAILED",
-                        "message": str(exc),
-                    }
-                )
-
-        hits = sorted(all_hits, key=lambda hit: hit.score, reverse=True)[:5]
-        context, citations, citation_mappings = self._assemble_context(hits)
-        answer = self._answer_generator.generate(question=message, context=context, has_hits=len(hits) > 0)
-        return QuickChatResult(
-            answer=answer,
-            citations=citations,
-            citation_mappings=citation_mappings,
-            attempts=all_attempts,
-            tool_calls=all_tool_calls,
-            errors=errors,
+        return await run_quick_graph(
+            message=message,
+            knowledge_base_ids=knowledge_base_ids,
+            retriever=lambda _kb_id, _q: [],
+            answer_generator=lambda question, context, has_hits: self._answer_generator.generate(
+                question=question,
+                context=context,
+                has_hits=has_hits,
+            ),
+            retrieve_attempts=retrieve_attempts,
         )
 
     async def _retrieve_attempts(

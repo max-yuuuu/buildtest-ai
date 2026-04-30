@@ -4,7 +4,6 @@ import type { ChangeEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import type { Route } from "next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -278,7 +277,7 @@ export default function KnowledgeBaseDetailPage() {
         <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <Link
-              href={"/knowledge-bases" as Route}
+              href="/knowledge-bases"
               className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
@@ -535,9 +534,7 @@ export default function KnowledgeBaseDetailPage() {
                         {d.status === "completed" ? (
                           <Button asChild variant="ghost" size="sm" className="h-7">
                             <Link
-                              href={
-                                `/knowledge-bases/${id}/documents/${d.id}/chunks` as Route
-                              }
+                              href={`/knowledge-bases/${id}/documents/${d.id}/chunks`}
                             >
                               <Eye className="mr-1 h-3.5 w-3.5" />
                               查看分块

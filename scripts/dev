@@ -353,23 +353,34 @@ main() {
 
 validate_address_mode() {
   local mode="$1"
-  if [[ "$mode" == "host" ]]; then
-    if [[ "${DATABASE_URL-}" != *"@localhost:"* ]]; then
-      err "DATABASE_URL must use localhost when app runs on host"
-      exit 1
-    fi
-    if [[ "${REDIS_URL-}" != redis://localhost:* ]]; then
-      err "REDIS_URL must use localhost when app runs on host"
-      exit 1
-    fi
-    if [[ "${QDRANT_URL-}" != http://localhost:* ]]; then
-      err "QDRANT_URL must use localhost when app runs on host"
-      exit 1
-    fi
-    if [[ "${BACKEND_URL-}" != http://localhost:* ]]; then
-      err "BACKEND_URL must use localhost when frontend runs on host"
-      exit 1
-    fi
+  if [[ "$mode" != "host" ]]; then
+    return 0
+  fi
+
+  # 本机直连 Docker 里的 infra 时，只允许 loopback，避免误用 compose 服务名导致连不上。
+  # 同时接受 127.0.0.1（常见 .env 写法），与 localhost 等价。
+  local db="${DATABASE_URL-}"
+  if [[ "$db" != *"@localhost:"* && "$db" != *"@127.0.0.1:"* ]]; then
+    err "DATABASE_URL must use @localhost: or @127.0.0.1: as DB host when app runs on host (see env/dev.host.env.example)"
+    exit 1
+  fi
+
+  local redis="${REDIS_URL-}"
+  if [[ "$redis" != redis://localhost:* && "$redis" != redis://127.0.0.1:* ]]; then
+    err "REDIS_URL must be redis://localhost:... or redis://127.0.0.1:... when app runs on host"
+    exit 1
+  fi
+
+  local qdrant="${QDRANT_URL-}"
+  if [[ "$qdrant" != http://localhost:* && "$qdrant" != http://127.0.0.1:* ]]; then
+    err "QDRANT_URL must be http://localhost:... or http://127.0.0.1:... when app runs on host"
+    exit 1
+  fi
+
+  local be="${BACKEND_URL-}"
+  if [[ "$be" != http://localhost:* && "$be" != http://127.0.0.1:* ]]; then
+    err "BACKEND_URL must be http://localhost:... or http://127.0.0.1:... when frontend runs on host"
+    exit 1
   fi
 }
 

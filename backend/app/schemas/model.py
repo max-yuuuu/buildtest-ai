@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-ModelType = Literal["llm", "embedding", "ocr"]
+ModelType = Literal["llm", "embedding", "ocr", "rerank", "vlm"]
 
 
 class ModelBase(BaseModel):

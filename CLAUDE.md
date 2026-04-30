@@ -126,7 +126,7 @@ collection 名按 user_id 派生,vector_db_configs 新增 namespace 字段。
 
 ```bash
 # 全栈
-docker compose up --build                    # 前端 :3000 / 后端 :8000 / API 文档 :8000/docs
+make dev                                     # 前端 :3000 / 后端 :8000 / API 文档 :8000/docs
 
 # 后端(cd backend)
 uvicorn app.main:app --reload                # 单独开发

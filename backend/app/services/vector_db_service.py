@@ -57,15 +57,6 @@ class VectorDbService:
             api_key_mask=api_mask,
             is_active=data.is_active,
         )
-        if row.is_active:
-            probe = await vector_db_probe.probe(
-                row.db_type, row.connection_string, row.api_key_encrypted
-            )
-            if not probe.ok:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"active vector db probe failed: {probe.message}",
-                )
         await self.repo.create(row)
         await self.session.commit()
         await self.session.refresh(row)
@@ -90,14 +81,6 @@ class VectorDbService:
         if data.is_active is not None:
             row.is_active = data.is_active
         if row.is_active:
-            probe = await vector_db_probe.probe(
-                row.db_type, row.connection_string, row.api_key_encrypted
-            )
-            if not probe.ok:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"active vector db probe failed: {probe.message}",
-                )
             await self.repo.deactivate_others(exclude_id=row.id)
         await self.session.commit()
         await self.session.refresh(row)

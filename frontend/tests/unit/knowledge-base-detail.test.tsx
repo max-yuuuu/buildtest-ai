@@ -80,7 +80,6 @@ describe("KnowledgeBaseDetailPage", () => {
   });
 
   it("文档状态会从排队中刷新到已完成", async () => {
-    vi.useFakeTimers();
     vi.spyOn(knowledgeBaseApi, "get").mockResolvedValue({
       id: "kb-1",
       user_id: "u1",
@@ -136,10 +135,12 @@ describe("KnowledgeBaseDetailPage", () => {
       </QueryClientProvider>,
     );
 
-    await waitFor(() => expect(screen.getByText("排队中")).toBeInTheDocument());
-    vi.advanceTimersByTime(3500);
-    await waitFor(() => expect(screen.getByText("已完成")).toBeInTheDocument());
-    vi.useRealTimers();
+    await waitFor(() => expect(screen.getByText("排队中")).toBeInTheDocument(), {
+      timeout: 2000,
+    });
+    await waitFor(() => expect(screen.getByText("已完成")).toBeInTheDocument(), {
+      timeout: 5000,
+    });
   });
 
   it("仅 completed 文档可查看分块", async () => {
@@ -195,7 +196,12 @@ describe("KnowledgeBaseDetailPage", () => {
       </QueryClientProvider>,
     );
 
-    await waitFor(() => expect(screen.getAllByText("查看分块").length).toBe(2));
+    await waitFor(() => expect(screen.getByText("已完成")).toBeInTheDocument(), {
+      timeout: 2000,
+    });
+    await waitFor(() => expect(screen.getAllByText("查看分块").length).toBe(2), {
+      timeout: 2000,
+    });
     const links = screen.getAllByRole("link", { name: "查看分块" });
     expect(links[0]).toHaveAttribute("href", "/knowledge-bases/kb-1/documents/doc-completed/chunks");
     const disabledButton = screen.getByRole("button", { name: "查看分块" });

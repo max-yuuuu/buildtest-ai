@@ -21,6 +21,7 @@ class IngestionJobService:
             knowledge_base_id=kb_id,
             document_id=doc_id,
             status="queued",
+            attempt_count=1,
             max_retries=max_retries,
         )
         await self.repo.create(job)

@@ -1,6 +1,21 @@
-import { auth } from "@/lib/auth";
 import { resolveBackendBaseUrl } from "@/lib/server/backend-url";
 import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
+
+/** JWT 会话 cookie 前缀：NEXTAUTH_URL 为 https 时用 __Secure- 前缀Cookie名 */
+function secureCookieForSessionToken(): boolean {
+  const url = process.env.NEXTAUTH_URL;
+  if (!url) return false;
+  try {
+    return new URL(url).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function jwtSecret(): string | null {
+  return process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? null;
+}
 
 /** HTTP fetch Headers 值必须是 Latin-1；OAuth 显示名可能含中文，用 Base64URL(UTF-8) 透传。 */
 function xUserNameHeaderValue(name: string | null | undefined): string {
@@ -17,8 +32,20 @@ const PUBLIC_PATHS = new Set(["auth"]);
 async function proxy(req: NextRequest, pathParts: string[]) {
   const isPublic = pathParts.length > 0 && PUBLIC_PATHS.has(pathParts[0]!);
 
-  const session = await auth();
-  if (!isPublic && !session?.user) {
+  const secret = jwtSecret();
+  if (!secret) {
+    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+  }
+
+  /** 仅解码会话 JWT，避免每条 BFF 请求走完整 auth()/session（开发期明显拖慢并行 API） */
+  const token = await getToken({
+    req,
+    secret,
+    secureCookie: secureCookieForSessionToken(),
+  });
+  const rawId = (token as { id?: string } | null)?.id ?? token?.sub ?? "";
+  const userId = typeof rawId === "string" && rawId !== "" ? rawId : "";
+  if (!isPublic && (!token || !userId)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -30,12 +57,11 @@ async function proxy(req: NextRequest, pathParts: string[]) {
     ? undefined
     : await req.arrayBuffer();
 
-  const headers: Record<string, string> = {};
-  if (session?.user) {
-    headers["X-User-Id"] = (session.user as { id?: string }).id ?? "";
-    headers["X-User-Email"] = session.user.email ?? "";
-    headers["X-User-Name"] = xUserNameHeaderValue(session.user.name);
-  }
+  const headers: Record<string, string> = {
+    "X-User-Id": userId,
+    "X-User-Email": (token?.email as string | undefined) ?? "",
+    "X-User-Name": xUserNameHeaderValue(token?.name as string | null | undefined),
+  };
   const ct = req.headers.get("content-type");
   if (ct) headers["Content-Type"] = ct;
 

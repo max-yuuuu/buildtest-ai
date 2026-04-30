@@ -57,15 +57,13 @@ class ModelService:
         return self._to_read(m)
 
     async def create(self, provider_id: uuid.UUID, data: ModelCreate) -> ModelRead:
-        provider = await self._ensure_provider(provider_id)
+        await self._ensure_provider(provider_id)
         existing = await self.repo.get_by_model_id(provider_id, data.model_id)
         if existing is not None:
             raise HTTPException(status_code=409, detail="model already registered")
         vector_dimension = data.vector_dimension
         if data.model_type == "embedding" and vector_dimension is None:
-            vector_dimension = await self.probe_embedding_dimension(
-                provider_id, data.model_id, provider
-            )
+            raise HTTPException(status_code=422, detail="embedding model requires vector_dimension")
         m = Model(
             provider_id=provider_id,
             model_id=data.model_id,
@@ -88,7 +86,7 @@ class ModelService:
     async def update(
         self, provider_id: uuid.UUID, model_pk: uuid.UUID, data: ModelUpdate
     ) -> ModelRead:
-        provider = await self._ensure_provider(provider_id)
+        await self._ensure_provider(provider_id)
         m = await self.repo.get(model_pk)
         if m is None or m.provider_id != provider_id:
             raise HTTPException(status_code=404, detail="model not found")
@@ -101,11 +99,9 @@ class ModelService:
         if data.embedding_batch_size is not None:
             m.embedding_batch_size = data.embedding_batch_size
         if m.model_type == "embedding" and m.vector_dimension is None:
-            m.vector_dimension = await self.probe_embedding_dimension(
-                provider_id, m.model_id, provider
-            )
-            if m.embedding_batch_size is None:
-                m.embedding_batch_size = self.EMBEDDING_BATCH_SIZE_DEFAULT
+            raise HTTPException(status_code=422, detail="embedding model requires vector_dimension")
+        if m.model_type == "embedding" and m.embedding_batch_size is None:
+            m.embedding_batch_size = self.EMBEDDING_BATCH_SIZE_DEFAULT
         if m.model_type == "ocr":
             m.vector_dimension = None
         # batch_size 仅 embedding 模型有意义;改为非 embedding 时顺带清空,避免字段语义漂移

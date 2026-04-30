@@ -17,7 +17,9 @@ from app.schemas.knowledge_base import (
     RetrieveRequest,
     RetrieveResponse,
 )
+from app.schemas.model_config import KnowledgeBaseModelConfigRead, KnowledgeBaseModelConfigUpsert
 from app.services.knowledge_base_service import KnowledgeBaseService
+from app.services.model_config_service import ModelConfigService
 
 router = APIRouter()
 
@@ -185,3 +187,22 @@ async def rebuild(
     body: RebuildRequest | None = Body(default=None),
 ) -> None:
     await _svc(session, user_id).rebuild(kb_id, body or RebuildRequest())
+
+
+@router.get("/{kb_id}/model-configs", response_model=list[KnowledgeBaseModelConfigRead])
+async def list_model_configs(
+    kb_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> list[KnowledgeBaseModelConfigRead]:
+    return await ModelConfigService(session, user_id).list_kb_configs(kb_id)
+
+
+@router.put("/{kb_id}/model-configs", response_model=list[KnowledgeBaseModelConfigRead])
+async def put_model_configs(
+    kb_id: uuid.UUID,
+    payload: list[KnowledgeBaseModelConfigUpsert],
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> list[KnowledgeBaseModelConfigRead]:
+    return await ModelConfigService(session, user_id).put_kb_configs(kb_id, payload)

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.auth.routes import router as auth_router
+from app.api.v1.agent_configs.routes import router as agent_configs_router
 from app.api.v1.chat.routes import router as chat_router
 from app.api.v1.knowledge_bases.routes import router as knowledge_bases_router
 from app.api.v1.models.routes import router as models_router
@@ -17,6 +18,7 @@ api_router.include_router(models_router, prefix="/providers/{provider_id}/models
 api_router.include_router(vector_dbs_router, prefix="/vector-dbs", tags=["vector-dbs"])
 api_router.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(chat_router, prefix="/chat", tags=["chat"])
+api_router.include_router(agent_configs_router, prefix="/agent-configs", tags=["agent-configs"])
 api_router.include_router(
     knowledge_bases_router, prefix="/knowledge-bases", tags=["knowledge-bases"]
 )

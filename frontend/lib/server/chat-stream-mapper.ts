@@ -19,6 +19,7 @@ export type ChatStreamMappingState = {
   messageId: string | null;
   textId: string | null;
   textStarted: boolean;
+  finished: boolean;
 };
 
 export function createChatStreamMappingState(): ChatStreamMappingState {
@@ -26,6 +27,7 @@ export function createChatStreamMappingState(): ChatStreamMappingState {
     messageId: null,
     textId: null,
     textStarted: false,
+    finished: false,
   };
 }
 
@@ -97,6 +99,7 @@ export function mapBackendEventToUiMessageChunkSse(
       chunks.push({ type: "text-end", id: state.textId! });
     }
     chunks.push({ type: "finish" });
+    state.finished = true;
     return chunks.map(toSse);
   }
 

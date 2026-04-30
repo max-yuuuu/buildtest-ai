@@ -11,34 +11,40 @@ from app.services.quick_chat_workflow import QuickChatOutput, RetrievalAttempt
 async def test_chat_stream_event_order_and_single_done():
     service = ChatService(session=None, user_id=uuid.uuid4())  # type: ignore[arg-type]
 
-    async def fake_run_quick(body):  # noqa: ANN001
-        _ = body
-        return QuickChatOutput(
-            answer="hello world",
-            citations=[
-                {
-                    "citation_id": "c1",
-                    "document_id": str(uuid.uuid4()),
-                    "chunk_index": 0,
-                    "score": 0.9,
-                    "source": {"section": "doc"},
-                }
-            ],
-            citation_mappings=[],
-            attempts=[
-                RetrievalAttempt(
-                    knowledge_base_id=str(uuid.uuid4()),
-                    attempt=1,
-                    query="hello",
-                    hit_count=1,
-                    latency_ms=12,
-                )
-            ],
-            tool_calls=[],
-            errors=[],
-        )
+    async def fake_stream_quick_graph_events(_body):  # noqa: ANN001
+        yield {"type": "step", "name": "retrieve", "status": "running"}
+        yield {"type": "step", "name": "retrieve", "status": "completed"}
+        yield {"type": "step", "name": "generate", "status": "running"}
+        yield {
+            "type": "result",
+            "result": QuickChatOutput(
+                answer="hello world",
+                citations=[
+                    {
+                        "citation_id": "c1",
+                        "document_id": str(uuid.uuid4()),
+                        "chunk_index": 0,
+                        "score": 0.9,
+                        "source": {"section": "doc"},
+                    }
+                ],
+                citation_mappings=[],
+                attempts=[
+                    RetrievalAttempt(
+                        knowledge_base_id=str(uuid.uuid4()),
+                        attempt=1,
+                        query="hello",
+                        hit_count=1,
+                        latency_ms=12,
+                    )
+                ],
+                tool_calls=[],
+                errors=[],
+            ),
+        }
+        yield {"type": "step", "name": "generate", "status": "completed"}
 
-    service._run_quick = fake_run_quick  # type: ignore[method-assign]
+    service._stream_quick_graph_events = fake_stream_quick_graph_events  # type: ignore[method-assign]
     events = [
         e
         async for e in service.stream(
@@ -54,32 +60,61 @@ async def test_chat_stream_event_order_and_single_done():
 
 
 @pytest.mark.asyncio
-async def test_chat_stream_terminates_on_error_without_done():
+async def test_chat_stream_emits_done_after_error():
     service = ChatService(session=None, user_id=uuid.uuid4())  # type: ignore[arg-type]
 
-    async def fake_run_quick(_body):  # noqa: ANN001
+    async def fake_stream_quick_graph_events(_body):  # noqa: ANN001
+        if False:
+            yield {}
         raise RuntimeError("boom")
 
-    service._run_quick = fake_run_quick  # type: ignore[method-assign]
+    service._stream_quick_graph_events = fake_stream_quick_graph_events  # type: ignore[method-assign]
     events = [
         e
         async for e in service.stream(
             ChatRequest(message="hello", knowledge_base_ids=[uuid.uuid4()], mode="quick")
         )
     ]
-    assert events[-1]["type"] == "error"
-    assert not any(e["type"] == "done" for e in events)
+    assert events[-2]["type"] == "error"
+    assert events[-1]["type"] == "done"
 
 
 @pytest.mark.asyncio
 async def test_chat_stream_agent_mode_emits_error_event():
     service = ChatService(session=None, user_id=uuid.uuid4())  # type: ignore[arg-type]
+
+    async def fake_stream_agent_graph_events(_body):  # noqa: ANN001
+        yield {"type": "step", "name": "think", "status": "running"}
+        yield {"type": "step", "name": "think", "status": "completed"}
+        yield {"type": "step", "name": "tool_call", "status": "running"}
+        yield {"type": "step", "name": "tool_call", "status": "completed"}
+        yield {
+            "type": "result",
+            "result": QuickChatOutput(
+                answer="agent answer",
+                citations=[],
+                citation_mappings=[],
+                attempts=[
+                    RetrievalAttempt(
+                        knowledge_base_id=str(uuid.uuid4()),
+                        attempt=1,
+                        query="hello",
+                        hit_count=0,
+                        latency_ms=10,
+                    )
+                ],
+                tool_calls=[],
+                errors=[],
+            ),
+        }
+
+    service._stream_agent_graph_events = fake_stream_agent_graph_events  # type: ignore[method-assign]
     events = [
         e
         async for e in service.stream(
             ChatRequest(message="hello", knowledge_base_ids=[uuid.uuid4()], mode="agent")
         )
     ]
-    assert len(events) == 1
-    assert events[0]["type"] == "error"
-    assert events[0]["code"] == "MODE_NOT_IMPLEMENTED"
+    assert events[0]["type"] == "start"
+    assert events[-1]["type"] == "done"
+    assert any(e["type"] == "text-delta" for e in events)
