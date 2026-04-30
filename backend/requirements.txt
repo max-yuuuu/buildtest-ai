@@ -12,6 +12,7 @@ psycopg[binary]==3.2.9
 alembic==1.13.3
 
 # ---------- 加密 ----------
+bcrypt==5.0.0
 cryptography==43.0.1
 
 # ---------- 认证(校验前端传来的 JWT / session) ----------
