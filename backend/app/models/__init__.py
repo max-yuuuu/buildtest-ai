@@ -7,6 +7,7 @@ from app.models.notification import Notification
 from app.models.provider import Provider
 from app.models.user import User
 from app.models.vector_db_config import VectorDbConfig
+from app.models.verification_code import VerificationCode
 
 __all__ = [
     "User",
@@ -18,4 +19,5 @@ __all__ = [
     "Document",
     "IngestionJob",
     "KbVectorChunk",
+    "VerificationCode",
 ]
