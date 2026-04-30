@@ -11,9 +11,14 @@ function xUserNameHeaderValue(name: string | null | undefined): string {
   return `b64.${b64}`;
 }
 
+/** 不需要登录即可访问的路径前缀（认证相关端点）。 */
+const PUBLIC_PATHS = new Set(["auth"]);
+
 async function proxy(req: NextRequest, pathParts: string[]) {
+  const isPublic = pathParts.length > 0 && PUBLIC_PATHS.has(pathParts[0]!);
+
   const session = await auth();
-  if (!session?.user) {
+  if (!isPublic && !session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -25,11 +30,12 @@ async function proxy(req: NextRequest, pathParts: string[]) {
     ? undefined
     : await req.arrayBuffer();
 
-  const headers: Record<string, string> = {
-    "X-User-Id": (session.user as { id?: string }).id ?? "",
-    "X-User-Email": session.user.email ?? "",
-    "X-User-Name": xUserNameHeaderValue(session.user.name),
-  };
+  const headers: Record<string, string> = {};
+  if (session?.user) {
+    headers["X-User-Id"] = (session.user as { id?: string }).id ?? "";
+    headers["X-User-Email"] = session.user.email ?? "";
+    headers["X-User-Name"] = xUserNameHeaderValue(session.user.name);
+  }
   const ct = req.headers.get("content-type");
   if (ct) headers["Content-Type"] = ct;
 
